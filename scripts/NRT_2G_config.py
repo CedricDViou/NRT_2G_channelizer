@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/cedric/anaconda3/envs/2point7/bin/python
 '''
 This code configures the ROACH2 used for NRT spectral backend.
 '''
@@ -12,23 +12,39 @@ import logging
 import pylab
 import matplotlib
 import signal
+import valon_synth
 
 roach2 = "192.168.1.100"
-bitstream = ".bof"
+bitstream = "../bof/nrt_spectro_2019_Aug_22_1240.bof"  # or .fpg ?
 katcp_port = 7147
 dst_ip_base = 192*(2**24) + 168*(2**16) + 5*(2**8) + 40*(2**0)
 dst_udp_port_base = 10000
 
 
-print('TODO: Configure Valon here!!!!')
-print('')
+print('Configuring Valon:')
+S = valon_synth.Synthesizer('/dev/ttyUSB0')
+S.set_rf_level(valon_synth.SYNTH_A, -4)
+S.set_frequency(valon_synth.SYNTH_A, 2048.0)
+S.set_rf_level(valon_synth.SYNTH_B, -4)
+S.set_frequency(valon_synth.SYNTH_B, 250.0)
+
+FA = S.get_frequency(valon_synth.SYNTH_A)
+PA = S.get_rf_level(valon_synth.SYNTH_A)
+FB = S.get_frequency(valon_synth.SYNTH_B)
+PB = S.get_rf_level(valon_synth.SYNTH_B)
+
+print("  Input clock is %f MHz, %f dB" % (FA, PA))
+print("    =>  Sampling clock is %f MHz, %f dB" % (2*FA, PA))
+print("  Input tone is %f MHz, %f dB" % (FB, PB))
+print('Done\n')
+
 
 print('Connecting to server %s on port %i... ' % (roach2, katcp_port))
 fpga = casperfpga.CasperFpga(roach2)
 time.sleep(0.2)
 
 
-assert fpga.is_connected(), 'ERROR connecting to server %s on port %i.\n' % (roach2, katcp_port))
+assert fpga.is_connected(), 'ERROR connecting to server %s on port %i.\n' % (roach2, katcp_port)
 
 print('------------------------')
 print('Programming FPGA with %s...' % bitstream)
