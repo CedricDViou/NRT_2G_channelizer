@@ -1,3 +1,6 @@
 [submodule "mlib_devel"]
 	path = mlib_devel
 	url = https://github.com/casper-astro/mlib_devel
+[submodule "ValonSynth"]
+	path = ValonSynth
+	url = https://github.com/nrao/ValonSynth
