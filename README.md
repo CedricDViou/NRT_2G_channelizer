@@ -1,1 +1,1 @@
-# NRT_2G_spectrometer
+# NRT_2G_channelizer
