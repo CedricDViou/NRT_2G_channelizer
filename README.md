@@ -27,6 +27,10 @@ $ pip install -r requirements.txt
 $ python setup.py install
 ```
 
+Little endian detection is broken for ROACH2:
+
+- Add ```fpga.is_little_endian = False``` after programming
+
 ### Install TFTP+DHCP+NFS server
 - Adapt setup instructions for DHCP+TFTP+NFS from https://docs.google.com/a/ska.ac.za/document/d/1tqw4C6uZ6EULl1OykTFL_vQTnK52UBr0aYqTg44E5wg, sections k, l, m.
 
