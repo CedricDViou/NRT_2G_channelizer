@@ -141,6 +141,74 @@ $ ./NRT_2G_config.py
 
 
 
+## Firmware developpement
+
+Start Matlab/Simulink
+```
+cedric@nanunib:/FAN/HDD2/CASPER$ ./startsg14_7
+```
+
+Open project /home/cedric/NRT_channelizer/nrt_spectro.slx
+
+Make your modifications, save.
+
+In transcript, call casper_xps, and click "Run XPS".
+
+
+
+## ADC / clocks firmware configuration
+
+- Production
+  - MSSGE ROACH2 User IP Rate (MHz) : 256
+  - adc5g ADC clock rate (MHz) : 2048
+- Test (24/08/2020)
+  - MSSGE ROACH2 User IP Rate (MHz) : 64
+  - adc5g ADC clock rate (MHz) : 512
+
+
+## RF-10M-PPS input signals
+
+
+### RF inputs
+ADC1x5000-8 ADC boards requires:
+
+- Clock: 2.5GHz (Max) 50Ohm 0dBm into SMA socket 
+- Signals: each is single-ended into SMA socket 
+
+Input pathes produce no gain.  Only a pair of baluns are on the way the the ADC chip (symetrification of the signal?).
+The ADC chip [documentation](https://casper.ssl.berkeley.edu/wiki/images/1/19/Ev8aq160.pdf) states that Analog input voltages should :
+
+- Common mode within -0.3 - 4.3 V
+- Diff mode under 4 Vpp
+
+
+As a start, for clock and line, we configured Valon 4008 to produce -4 dBm RF levels.
+```
+Input clock is 2000.000000 MHz, -4.000000 dB (locked)
+ =>  Sampling clock is 4000.000000 MHz, -4.000000 dB
+Input tone is 250.000000 MHz, -4.000000 dB (locked)
+```
+
+An extra 20 dB attenuator is inserted on the ADC input path.
+
+
+### 10 MHz
+Valon 4008 requires 0.2 to 1 Vpk-pk input level.
+
+WR-LEN used for tests produces 2 Vpk-pk input level.
+
+A 3 dB SAM attenuator was inserted on the connection to adapt levels.
+
+
+### PPS
+ADC1x5000-8 ADC boards requires:
+
+- Sync: LVTTL, 5V tolerant, terminated with 50 ohm load, into SMA socket 
+
+WR-LEN generates 1.8V into 50 ohms load.
+We connect directly.
+
+
 ## Known issues
 netboot fails when claiming access to root dir NFS:
 ```
