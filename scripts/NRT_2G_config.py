@@ -14,8 +14,8 @@ import matplotlib
 import signal
 import valon_synth
 
-roach2 = "192.168.1.100"
-bitstream = "../bof/nrt_spectro_2019_Aug_22_1240.bof"  # or .fpg ?
+roach2 = "192.168.40.96"
+bitstream = "../bof/nrt_2g_no_dsp/nrt_2g_no_dsp_2019_Aug_27_1439.fpg"
 katcp_port = 7147
 dst_ip_base = 192*(2**24) + 168*(2**16) + 5*(2**8) + 40*(2**0)
 dst_udp_port_base = 10000
@@ -23,8 +23,16 @@ dst_udp_port_base = 10000
 
 print('Configuring Valon:')
 S = valon_synth.Synthesizer('/dev/ttyUSB0')
+
+ext_ref = True
+S.set_ref_select(ext_ref)
+S.set_reference(10000000.0)
+
+S.set_options(valon_synth.SYNTH_A, double=1, half=0, divider=1, low_spur=0)
 S.set_rf_level(valon_synth.SYNTH_A, -4)
-S.set_frequency(valon_synth.SYNTH_A, 2048.0)
+S.set_frequency(valon_synth.SYNTH_A, 2000.0)
+
+S.set_options(valon_synth.SYNTH_B, double=1, half=0, divider=1, low_spur=0)
 S.set_rf_level(valon_synth.SYNTH_B, -4)
 S.set_frequency(valon_synth.SYNTH_B, 250.0)
 
@@ -32,10 +40,17 @@ FA = S.get_frequency(valon_synth.SYNTH_A)
 PA = S.get_rf_level(valon_synth.SYNTH_A)
 FB = S.get_frequency(valon_synth.SYNTH_B)
 PB = S.get_rf_level(valon_synth.SYNTH_B)
+LA = S.get_phase_lock(valon_synth.SYNTH_A)
+LB = S.get_phase_lock(valon_synth.SYNTH_B)
 
-print("  Input clock is %f MHz, %f dB" % (FA, PA))
-print("    =>  Sampling clock is %f MHz, %f dB" % (2*FA, PA))
-print("  Input tone is %f MHz, %f dB" % (FB, PB))
+
+print("  Input clock is %f MHz, %f dBm (%slocked)" % (FA,
+                                                     PA,
+                                                     "" if LA else "NOT "))
+print("    =>  Sampling clock is %f MHz, %f dBm" % (2*FA, PA))
+print("  Input tone is %f MHz, %f dBm (%slocked)" % (FB,
+                                                    PB,
+                                                    "" if LB else "NOT "))
 print('Done\n')
 
 
@@ -64,8 +79,8 @@ fpga.write_int('rescale_pol0_bitselect', 0)
 fpga.write_int('rescale_pol1_bitselect', 0)
 
 for stream in range(7):
-    fpga.write_int('TenGbE%d_hdr_head_size' % stream, 2)
-    fpga.write_int('TenGbE%d_hdr_head_offset' % stream, 3)
+    fpga.write_int('TenGbE%d_hdr_heap_size' % stream, 2)
+    fpga.write_int('TenGbE%d_hdr_heap_offset' % stream, 3)
     fpga.write_int('TenGbE%d_hdr_pkt_len_words' % stream, 1024)
     fpga.write_int('TenGbE%d_hdr5_0x1600_DIR' % stream, 5)
     fpga.write_int('TenGbE%d_hdr6_0x1234_DIR' % stream, 6)
