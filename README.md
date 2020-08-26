@@ -12,6 +12,7 @@ python==2.7
 ### Valon synthesizer
 
 ```
+$ source activate 2point7
 $ cd ValonSynth
 $ python setup.py build
 $ python setup.py install
