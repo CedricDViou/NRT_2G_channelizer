@@ -4,28 +4,91 @@
 
 ## Requirements
 
-python==2.7
+- Fresh Ubuntu 18.04.5 LTS install
+- python==2.7
 
 
 ## Installation
 
-### Valon synthesizer
+### Get sources
 
 ```
-$ source activate 2point7
+$ git clone --recurse-submodules https://github.com/CedricDViou/NRT_2G_channelizer.git
+```
+or
+```
+$ git clone https://github.com/CedricDViou/NRT_2G_channelizer.git
+$ git submodule init
+$ git submodule update
+```
+
+### Valon synthesizer
+
+Install with:
+```
+$ sudo pip install pyserial   # NOT serial
 $ cd ValonSynth
 $ python setup.py build
-$ python setup.py install
+$ sudo python setup.py install
+$ sudo usermod -a -G dialout $USER
 ```
+
+Test with:
+```
+$ ipython
+In [1]: import valon_synth
+In [2]: S = valon_synth.Synthesizer('/dev/ttyUSB0')
+In [3]: FA = S.get_frequency(valon_synth.SYNTH_A)
+In [4]: print(FA)
+2000.0   # or something else...
+```
+
+### Power on ROACH2
+
+- Connect USB cable to "FTDI USB" of the ROACH2
+- run terminal with 115200 8N1, "Hardware Flow Control" = No
+```
+$ minicom -D /dev/ttyUSB3
+```
+- You should see the boot sequence:
+```
+U-Boot 2011.06-rc2-00000-g2694c9d-dirty (Dec 04 2013 - 20:58:06)
+
+CPU:   AMCC PowerPC 440EPx Rev. A at 533.333 MHz (PLB=133 OPB=66 EBC=66)
+       No Security/Kasumi support
+       Bootstrap Option C - Boot ROM Location EBC (16 bits)
+       32 kB I-Cache 32 kB D-Cache
+Board: ROACH2
+I2C:   ready
+DRAM:  512 MiB
+...
+
+```
+
+More docs on:
+- https://casper.astro.berkeley.edu/wiki/Getting_Started_with_ROACH2
+- https://casper.astro.berkeley.edu/wiki/ROACH_NFS_guide
+
 
 ### casperfpga
 
+Install with:
 ```
-$ source activate 2point7
 $ git clone https://github.com/casper-astro/casperfpga  # commit 0fed055d1c62a93dff68afec32b0c9ada776b07d
 $ cd casperfpga
-$ pip install -r requirements.txt
-$ python setup.py install
+$ git checkout master
+$ sudo apt-get install python-pip
+$ sudo pip install -r requirements.txt
+$ sudo python setup.py install
+```
+
+Test with:
+```
+$ ipython
+In [1]: import casperfpga
+
+In [2]: casperfpga.__version__
+Out[2]: '0.0+unknown.202108240911'
 ```
 
 Little endian detection is broken for ROACH2:
@@ -37,8 +100,8 @@ Little endian detection is broken for ROACH2:
 
 ```
 git clone https://github.com/ska-sa/roach2_nfs_uboot
-cd roach2_nfs_uboot
 sudo -i
+cd /home/cedric/roach2_nfs_uboot
 mkdir -p /home/nfs/roach2
 cp -r roach2_nfs_uboot/tftpboot/uboot-roach2 /home/nfs/roach2
 mv /home/nfs/roach2/uboot-roach2 /home/nfs/roach2/boot
@@ -165,6 +228,9 @@ In transcript, call casper_xps, and click "Run XPS".
 - Test (24/08/2020)
   - MSSGE ROACH2 User IP Rate (MHz) : 64
   - adc5g ADC clock rate (MHz) : 512
+- adc_and_regs
+  - MSSGE ROACH2 User IP Rate (MHz) : 187.5
+  - adc5g ADC clock rate (MHz) : 1500
 
 
 ## RF-10M-PPS input signals
