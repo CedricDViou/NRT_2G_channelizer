@@ -14,8 +14,9 @@ import matplotlib
 import signal
 import valon_synth
 
-roach2 = "192.168.40.96"
+roach2 = "192.168.40.71"
 bitstream = "../bof/nrt_2g_no_dsp/nrt_2g_no_dsp_2019_Aug_27_1439.fpg"
+bitstream = "../bof/adc_and_regs/adc_and_regs_2021_Aug_24_1159.fpg"
 katcp_port = 7147
 dst_ip_base = 192*(2**24) + 168*(2**16) + 5*(2**8) + 40*(2**0)
 dst_udp_port_base = 10000
@@ -23,6 +24,8 @@ dst_udp_port_base = 10000
 
 print('Configuring Valon:')
 S = valon_synth.Synthesizer('/dev/ttyUSB0')
+Fe = 1500.0
+Fin = 130.0
 
 ext_ref = True
 S.set_ref_select(ext_ref)
@@ -30,11 +33,11 @@ S.set_reference(10000000.0)
 
 S.set_options(valon_synth.SYNTH_A, double=1, half=0, divider=1, low_spur=0)
 S.set_rf_level(valon_synth.SYNTH_A, -4)
-S.set_frequency(valon_synth.SYNTH_A, 2000.0)
+S.set_frequency(valon_synth.SYNTH_A, Fe)
 
 S.set_options(valon_synth.SYNTH_B, double=1, half=0, divider=1, low_spur=0)
 S.set_rf_level(valon_synth.SYNTH_B, -4)
-S.set_frequency(valon_synth.SYNTH_B, 250.0)
+S.set_frequency(valon_synth.SYNTH_B, Fin)
 
 FA = S.get_frequency(valon_synth.SYNTH_A)
 PA = S.get_rf_level(valon_synth.SYNTH_A)
@@ -68,63 +71,29 @@ fpga.upload_to_ram_and_program(bitstream)
 print('done')
 
 
-print('Configuration')
-fpga.write_int('reset', 1)
-time.sleep(0.2)
-fpga.write_int('reset', 0)
+print(fpga.listdev())
 
-fpga.write_int('fft_shift', 0x2aa)
+fpga.write_int('counter_ctrl', 0x01)
+for i in range(10):
+    print(fpga.read_uint('counter_value'))
 
-fpga.write_int('rescale_pol0_bitselect', 0)
-fpga.write_int('rescale_pol1_bitselect', 0)
-
-for stream in range(7):
-    fpga.write_int('TenGbE%d_hdr_heap_size' % stream, 2)
-    fpga.write_int('TenGbE%d_hdr_heap_offset' % stream, 3)
-    fpga.write_int('TenGbE%d_hdr_pkt_len_words' % stream, 1024)
-    fpga.write_int('TenGbE%d_hdr5_0x1600_DIR' % stream, 5)
-    fpga.write_int('TenGbE%d_hdr6_0x1234_DIR' % stream, 6)
-    fpga.write_int('TenGbE%d_dst_ip' % stream, dst_ip_base + stream)
-    fpga.write_int('TenGbE%d_dst_port' % stream, dst_udp_port_base + stream)
+fpga.write_int('a', 0x01)
+fpga.write_int('b', 0x10)
+print(fpga.read_int('sum_a_b'))
 
 
 
-print('Wait for half second and arm PPS_trigger')
-now = time.time()
-before_half_second = 0.5 - (now-int(now))
-if before_half_second < 0:
-    before_half_second += 1
-time.sleep(before_half_second)
+for snapshot in fpga.snapshots:
+    data = snapshot.read_raw(man_valid=True, man_trig=True)
+    data = np.frombuffer(data[0]['data'], dtype='int8')
 
-fpga.write_int('pps_arm', 1)
-fpga.write_int('pps_arm', 0)
+    figure(1)
+    plot(data[:1000])
 
-print('Started!!!')
+    figure(2)
+    Nfft = len(data)
+    f = np.arange(Nfft, dtype='float') / Nfft * 2*Fe
+    plot(f, 20*np.log10(np.abs(fft.fft(data*blackman(Nfft)))))
 
+    data.tofile(snapshot.name + "_adc_data.txt")
 
-regs_to_poll = ['reorder_frm_cnt0',
-                ]
-stream_regs_to_poll = ['TenGbE%d_data_overflow',
-                       'TenGbE%d_tx_afull',
-                       'TenGbE%d_tx_overflow',
-                       ]
-
-# define signal handler to quit the everlasting loop nicely
-RUNNING = True
-def signal_handler(signal, frame):
-    global RUNNING
-    print('\nExiting...')
-    RUNNING = False
-signal.signal(signal.SIGINT, signal_handler)
-
-
-while RUNNING:
-    print(time.ctime())
-    for reg in regs_to_poll:
-        print(' %25s = %d' % (reg, fpga.read_int(reg)))
-    print('')
-    for stream in range(7):
-        for reg in stream_regs_to_poll:
-            print(' %25s = %d' % (reg % stream, fpga.read_int(reg % stream)))
-    print('')
-    time.sleep(1)
