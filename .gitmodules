@@ -4,3 +4,6 @@
 [submodule "ValonSynth"]
 	path = ValonSynth
 	url = https://github.com/nrao/ValonSynth
+[submodule "adc5g_devel"]
+	path = adc5g_devel
+	url = https://github.com/CedricDViou/adc5g_devel
