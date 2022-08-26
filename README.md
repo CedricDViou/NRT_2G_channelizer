@@ -173,6 +173,14 @@ root@nanunib:/home/nfs# more /etc/exports
 /home/nfs	192.168.40.0/24(rw,subtree_check,no_root_squash)
 ```
 
+- Start dhcp server:
+```
+cedric@cedric-HP-ZBook-15-G2:~$ sudo /etc/init.d/dnsmasq restart
+[sudo] password for cedric: 
+[ ok ] Restarting dnsmasq (via systemctl): dnsmasq.service.
+```
+
+
 
 ## Update ROACH2 ROMFS and Image
 From https://github.com/ska-sa/roach2_nfs_uboot
