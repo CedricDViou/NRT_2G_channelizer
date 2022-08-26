@@ -23,10 +23,8 @@
 - [ ] Gather fpga config, control and ADC calibration functions within a class.
 
 
-TODO:
-- Regenerate 2-pols FFT with fanout=1
-- adc_sst_v8: fit with new 2-pol FFT
-
+- reorder firmware design files in project
+- Adapt scripts to these new locations
 
 
 ## 2022/08/26
@@ -38,7 +36,8 @@ TODO:
     - Some due to large fanout (was 4, reduce it to 2, regenerate fft)
   - fit
   - Same negative slacks on fanouts to multipliers
-  - TODO: Regenerate 2-pols FFT with fanout=1
+  - Regenerate 2-pols FFT with fanout=1
+  - fit with new 2-pol FFT
 
 - adc_sst_v7
   - From adc_c9r_sst_v1_module.py, create modules and import them into adc_sst_v7.py to test design
@@ -48,6 +47,8 @@ TODO:
   - Hamming window looks OK at 100 MHz
     - ![Hamming Window for SEFRAM](./doc/20200826_hamming_win.png)
 
+- Commit a bunch of old stuff on github and clone repo on dev servers
+  
 
 ## 2022/08/25
 - adc_sst_v7
