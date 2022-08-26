@@ -1,0 +1,13 @@
+mesure des bandes des cornets en cabine basse le 19/04/22
+
+mesure sur cables coaxiaux avant attenuateurs et sortie circulateur au FSH8.
+
+E BF
+W BF
+
+E HF
+W HF
+
+E BF sortie circu
+W BF sortie circu
+
