@@ -44,13 +44,13 @@ time.sleep(0.5)
 fpga.write_int('TenGbE0_hdr_pkt_len_words', 1024)
 
 # 10GbE IP for devenvr2-1
-SOURCE_IP=10*(2**24)+17*(2**16)+1*(2**8)+64
+SOURCE_IP = 10*(2**24)+17*(2**16)+1*(2**8)+64
 time.sleep(0.5)
 
 # roach2 10Gbe configuration stuff
-FABRIC_PORT=52000
+FABRIC_PORT = 52000
 time.sleep(0.5)
-MAC_BASE=(2<<32)+(2<<40)
+MAC_BASE = (2<<32)+(2<<40)
 time.sleep(0.5)
 
 # configure 10GbE transmission for port 0
