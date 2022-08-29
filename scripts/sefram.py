@@ -59,6 +59,18 @@ class sefram(object):
     self.ID = 0xcece
     self.Nfft = 2**12
 
+  def __str__(self):
+    return "SEFRAM __str__"
+
+  def __repr__(self):
+    return "sefram(fpga=%s, Fe=%d, vacc_n_framer_basename=\'%s\', channelizer_basename=\'%s\', network_basename=\'%s\')" % (
+            str(self.fpga),
+            self.Fe,
+            self.vacc_n_framer_basename,
+            self.channelizer_basename,
+            self.network_basename,
+            )
+            
   @property
   def acc_len(self):
     return self.fpga.read_uint(self.vacc_n_framer_basename+'acc_len')

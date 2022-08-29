@@ -44,6 +44,18 @@ class Channelizer(object):
     self.network_basename = network_basename
     self.MAX_NOF_CHAN = 4
 
+  def __str__(self):
+    return "Channelizer __str__"
+
+  def __repr__(self):
+    return "Channelizer(fpga=%s, Fe=%d, channelizer_basename=\'%s\', rescale_basename=\'%s\', select_basename=\'%s\', network_basename=\'%s\')" % (
+            str(self.fpga),
+            self.Fe,
+            self.channelizer_basename,
+            self.rescale_basename,
+            self.select_basename,
+            self.network_basename,
+            )
 
   def debug_params(self):
     # switch buses for constants to help debug
@@ -64,7 +76,6 @@ class Channelizer(object):
     #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b1000)
     #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b0010)
 
-
   def clear(self):
     print('Reset some counters')
     self.fpga.write_int(self.select_basename+'ctrl', 0)
@@ -77,7 +88,6 @@ class Channelizer(object):
     self.fpga.write_int(self.network_basename+'rst', 0)
     self.fpga.write_int(self.channelizer_basename+'clear_ovr', 0)
     time.sleep(0.2)
-
 
   def network_config(self):
     # configure framer
@@ -94,7 +104,6 @@ class Channelizer(object):
     self.fpga.write_int(self.network_basename+'dst_ip'  , 0xc0a805b4, blindwrite=True)  # 192.168.5.180
     self.fpga.write_int(self.network_basename+'dst_port',     0xcece)
 
-
   def arm(self):
     print('Wait for half second and arm PPS_trigger')
     self.fpga.write_int('reg_arm', 0)
@@ -107,7 +116,6 @@ class Channelizer(object):
 
     self.fpga.write_int('reg_arm', 1)
 
-
   @property
   def fft_shift(self):
     self._fft_shift = self.fpga.read_uint(self.channelizer_basename+'fft_shift')
@@ -117,7 +125,6 @@ class Channelizer(object):
   def fft_shift(self, value):
     self._fft_shift = value
     self.fpga.write_int(self.channelizer_basename+'fft_shift', self._fft_shift)
-
 
   @property
   def scale(self):
@@ -132,7 +139,6 @@ class Channelizer(object):
     self._scale = value
     self.fpga.write_int(self.rescale_basename+'pol0_bitselect', self._scale[0])
     self.fpga.write_int(self.rescale_basename+'pol1_bitselect', self._scale[1])
-
 
   @property
   def channels(self):

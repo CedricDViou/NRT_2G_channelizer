@@ -39,6 +39,7 @@ class ADC(object):
   def __init__(self, fpga=None, zdok_n=None, Fe=None, adcmode='I', snap_basename='ADC_wave'):
     assert fpga is not None
     assert zdok_n is not None
+    assert Fe is not None
     self.fpga = fpga
     self.zdok_n = zdok_n
     self.Fe = Fe
@@ -60,6 +61,12 @@ class ADC(object):
     # overload adc5g get_snapshot
     global adc5g
     adc5g.tools.get_snapshot = self._get_snapshot
+
+  def __str__(self):
+    return "ASIAA 5 GSps ADC on ZDOK%d sampling input %s at %f GS/s" % (self.zdok_n, self._adcmode, self.Fe/1e9)
+
+  def __repr__(self):
+    return "ADC(fpga=%s, zdok_n=%d, Fe=%d, snap_basename=\'%s\')" % (str(self.fpga), self.zdok_n, self.Fe, self.snap_basename)
 
   # define get_snapshot as we don't have it available in our casperfpga lib version
   def _get_snapshot(self, fpga, snap_name, bitwidth=8, man_trig=True, wait_period=2):

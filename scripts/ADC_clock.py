@@ -36,7 +36,14 @@ from valon_synth import Synthesizer, SYNTH_A, SYNTH_B
 
 class ADC_clock(Synthesizer):
   def __init__(self, dev='/dev/ttyUSB_valon'):
+    self.dev = dev
     Synthesizer.__init__(self, dev)
+
+  def __str__(self):
+    return "ADC_clock __str__"
+
+  def __repr__(self):
+    return "ADC_clock(dev=\'%s\')" % (self.dev)
 
   def set_config(self, FA=None, PA=None, FB=None, PB=None):
     self.set_ref_config(ref_freq=10e6, ext_ref = True)
