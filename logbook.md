@@ -27,8 +27,117 @@
 - Adapt scripts to these new locations
 
 
-## 2022/08/26
+## 2022/09/01
 
+- adc_c9r_sst_v2
+  - Modify ucf with planHead
+    - shrink apodisation area to minimum
+    - add more space for sefram/fft*
+  - fit
+
+
+## 2022/08/31
+
+- fft_wideband_real
+  - Those srl16 are really a pain.  In particular in bus_replicate where fanout is better with regs only
+  - Modify /FAN/HDD2/CASPER/mlib_dev/casper_library/bus_replicate_init.m:107
+  - Replace srl16 by reg-based pipeline
+    ```matlab
+        %reuse_block(blk, dname, 'xbsIndex_r4/Delay', ...
+        %  'reg_retiming', reg_retiming, 'latency', '1', ...
+        %  'Position', [xpos_tmp-del_w/2 ypos_tmp-del_d/2 xpos_tmp+del_w/2 ypos_tmp+del_d/2]);
+        
+        reuse_block(blk, dname, 'casper_library_delays/pipeline', ...
+          'latency', '1', ...
+          'Position', [xpos_tmp-del_w/2 ypos_tmp-del_d/2 xpos_tmp+del_w/2 ypos_tmp+del_d/2]);
+    ```
+  - Generate fft_wideband_real and nrt_bw1800_ch2048_fft_core
+  - resynth_netlist('nrt_bw1800_ch2048_fft_core')
+          '-register_balancing', 'yes', ...
+          '-optimize_primitives', 'yes', ...
+          '-read_cores', 'yes', ...
+          '-max_fanout', '4', ...
+  - fit failed with -2ns slack on invert in coef gen of twiddle fft
+  - Set fft adder latency = 2
+  - Generate fft_wideband_real and nrt_bw1800_ch2048_fft_core
+  - resynth_netlist('nrt_bw1800_ch2048_fft_core')
+          '-register_balancing', 'yes', ...
+          '-optimize_primitives', 'yes', ...
+          '-read_cores', 'yes', ...
+          '-max_fanout', '4', ...
+  - map failed (area too small for LUTM in sefram/fft*)
+
+
+## 2022/08/30
+
+- adc_c9r_sst_v2
+  - Regenerate nrt_bw1800_ch2048_fft_core
+    - not adder in DSP48
+    - DSP instanciated
+    - latency = 1 for all, except BRAM=2
+  - resynth_netlist('nrt_bw1800_ch2048_fft_core')
+          '-register_balancing', 'yes', ...
+          '-optimize_primitives', 'yes', ...
+          '-read_cores', 'yes', ...
+          '-max_fanout', '4', ...
+  - fit
+  - Failing with -2ns slacks
+    - Mostly in sefram/fft1/fft_wideband_real/fft_direct/butterfly1/twiddle/bus_mult*/mult*/a_replicate/din*_*/srl_delay
+    - Where a simple register would do
+
+
+## 2022/08/29
+
+- mlib_dev
+  - Change MAP and PAR options (xe c)
+- adc_c9r_sst_v2
+  - Cloned from adc_c9r_sst_v1
+  - Replace 2-taps PFB for SEFRAM by apodisation
+  - Backup nrt_bw1800_ch2048_fft_core
+  - Regenerate nrt_bw1800_ch2048_fft_core
+  - resynth_netlist('nrt_bw1800_ch2048_fft_core')
+          '-register_balancing', 'yes', ...
+          '-optimize_primitives', 'yes', ...
+          '-read_cores', 'yes', ...
+          '-max_fanout', '4', ...
+  - Backup nrt_bw1800_ch64_fft_core
+  - Regenerate nrt_bw1800_ch64_fft_core
+  - resynth_netlist('nrt_bw1800_ch64_fft_core')
+          '-register_balancing', 'yes', ...
+          '-optimize_primitives', 'yes', ...
+          '-read_cores', 'yes', ...
+          '-max_fanout', '4', ...
+  - fit failing mostly with -0.390 ns slack, in sefram FFT wide band coef gen DRAM and with -0.2 ns in channelizer FFT wide band DSP mult
+  - planHead
+  - Change sefram fft ch2048 to look like channelizer fft 64ch params:
+    - Implementation: DSP48 adder in butterfly
+    - Latency
+      - BRAM 3->2
+      - Convert 2->1
+  - Regenerate fft 2048
+  - resynth_netlist('nrt_bw1800_ch2048_fft_core')
+          '-register_balancing', 'yes', ...
+          '-optimize_primitives', 'yes', ...
+          '-read_cores', 'yes', ...
+          '-max_fanout', '4', ...
+  - fit
+    - Failed because fft now requires too many adders (464)
+    - Restart from previous fft 2048, resynth and compile with -xe c for map and par
+    - Failed with -0.4ns
+  
+
+- adc_c9r_v4.1
+  - Implement channelizer module and integrate in adc_c9r_v4.1
+
+## 2022/08/27
+
+- adc_sst_v8
+  - Failed to route
+  - Regenerate fft without resynth_netlist lc off
+  - Failed to route
+
+
+## 2022/08/26
 
 - adc_sst_v8
   - Negative slacks in FFT
@@ -37,6 +146,7 @@
   - fit
   - Same negative slacks on fanouts to multipliers
   - Regenerate 2-pols FFT with fanout=1
+  - resynth_netlist
   - fit with new 2-pol FFT
 
 - adc_sst_v7
