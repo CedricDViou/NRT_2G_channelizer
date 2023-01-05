@@ -91,13 +91,22 @@ class ADC(object):
   def print_DVW_calibration(self):
     print(adc5g.tools.pretty_glitch_profile(*self.DVW_cal))
 
-  def get_snapshot(self):
+  def get_snapshot(self, count=1):
     data = self.snapshot.read_raw(man_valid=True, man_trig=True)
-    self.wave = np.frombuffer(data[0]['data'], dtype='int8')
+    tmp = np.frombuffer(data[0]['data'], dtype='int8')
+    if count == 1:
+      self.wave = tmp
+    elif count > 1:
+      nof_samples = tmp.shape[0]
+      self.wave = np.empty((count, nof_samples), dtype='int8')
+      self.wave[0] = tmp
+      for itt in range(1, count):
+        data = self.snapshot.read_raw(man_valid=True, man_trig=True)
+        self.wave[itt] = np.frombuffer(data[0]['data'], dtype='int8')
 
   def dump_snapshot(self):
     if self.wave is not None:
-      self.wave.tofile(self.snapshot.name + "_data.bin")
+      self.wave.tofile(self.snapshot.name + "_data.bin", sep = '')
 
   @property
   def adcmode(self):

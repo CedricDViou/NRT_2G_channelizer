@@ -32,7 +32,7 @@
 
 import time
 
-class Channelizer(object):
+class channelizer(object):
   def __init__(self, fpga=None, Fe=None, channelizer_basename='channelizer_', rescale_basename='rescale_', select_basename='select_4f64_', network_basename='TenGbE0_'):
     assert fpga is not None
     assert Fe is not None
@@ -56,26 +56,7 @@ class Channelizer(object):
             self.select_basename,
             self.network_basename,
             )
-
-  def debug_params(self):
-    # switch buses for constants to help debug
-    # 0b00 : ADC input
-    # 0b01 : 0's
-    # 0b10 : "other" ADC input
-    # 0b11 : 64, 0 (15 times), 64, 0 , ....
-    self.fpga.write_int('set_fft_input', 0b0000)
-    #self.fpga.write_int('set_fft_input', 0b0001)
-    #self.fpga.write_int('set_fft_input', 0b0100)
-    #self.fpga.write_int('set_fft_input', 0b1010)
-    
-    self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b0000)
-    #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b0001)
-    #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b0101)
-    #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b0100)
-    #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b1010)
-    #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b1000)
-    #self.fpga.write_int(self.channelizer_basename+'set_out_zeros', 0b0010)
-
+  
   def clear(self):
     print('Reset some counters')
     self.fpga.write_int(self.select_basename+'ctrl', 0)
@@ -102,19 +83,8 @@ class Channelizer(object):
 
     # configure 10G
     self.fpga.write_int(self.network_basename+'dst_ip'  , 0xc0a805b4, blindwrite=True)  # 192.168.5.180
-    self.fpga.write_int(self.network_basename+'dst_port',     0xcece)
+    self.fpga.write_int(self.network_basename+'dst_port',     0xdede)
 
-  def arm(self):
-    print('Wait for half second and arm PPS_trigger')
-    self.fpga.write_int('reg_arm', 0)
-
-    now = time.time()
-    before_half_second = 0.5 - (now-int(now))
-    if before_half_second < 0:
-        before_half_second += 1
-    time.sleep(before_half_second)
-
-    self.fpga.write_int('reg_arm', 1)
 
   @property
   def fft_shift(self):

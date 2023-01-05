@@ -51,13 +51,14 @@ class sefram(object):
     assert fpga is not None
     self.fpga = fpga
     self.vacc_n_framer_basename = vacc_n_framer_basename
+    self.packetizer_basename = 'pck_'
     self.channelizer_basename = channelizer_basename
     self.network_basename = network_basename
     self.Fe = int(Fe)
     self.F_valon = self.Fe / 2
     self.Fsys = self.F_valon / 8
     self.ID = 0xcece
-    self.Nfft = 2**12
+    self.Nfft = 2**11
 
   def __str__(self):
     return "SEFRAM __str__"
@@ -83,20 +84,20 @@ class sefram(object):
 
   @property
   def Fe(self):
-    return self.fpga.read_uint(self.vacc_n_framer_basename+'pcktizer_ADC_freq')
+    return self.fpga.read_uint(self.vacc_n_framer_basename + self.packetizer_basename + 'ADC_freq')
 
   @Fe.setter 
   def Fe(self, value):
     assert type(value) is int
-    self.fpga.write_int(self.vacc_n_framer_basename+'pcktizer_ADC_freq', value, blindwrite=True)
+    self.fpga.write_int(self.vacc_n_framer_basename + self.packetizer_basename + 'ADC_freq', value, blindwrite=True)
 
   @property
   def ID(self):
-    return self.fpga.read_uint(self.vacc_n_framer_basename+'pcktizer_framer_id')
+    return self.fpga.read_uint(self.vacc_n_framer_basename + self.packetizer_basename + 'framer_id')
 
   @ID.setter 
   def ID(self, value):
-    self.fpga.write_int(self.vacc_n_framer_basename+'pcktizer_framer_id', value)
+    self.fpga.write_int(self.vacc_n_framer_basename + self.packetizer_basename + 'framer_id', value)
 
 
   @property
@@ -143,7 +144,7 @@ class sefram(object):
     self.fpga.write_int(self.vacc_n_framer_basename+'rst', 1)
     self.fpga.write_int(self.vacc_n_framer_basename+'en', 0)
 
-  def arm(self):
+  def arm(self):   # à renomer
     self.fpga.write_int(self.network_basename+'rst', 0)
     self.fpga.write_int(self.vacc_n_framer_basename+'rst', 0)
 
@@ -152,9 +153,9 @@ class sefram(object):
 
   @property
   def time(self):
-    ts         = self.fpga.read_uint(self.vacc_n_framer_basename+'pcktizer_cur_timestamp')
-    sample_cnt = self.fpga.read_uint(self.vacc_n_framer_basename+'pcktizer_cur_smpl_cnt')
-    sysfreq    = self.fpga.read_uint(self.vacc_n_framer_basename+'pcktizer_cur_smpl_per_sec')
+    ts         = self.fpga.read_uint(self.vacc_n_framer_basename + self.packetizer_basename + 'cur_timestamp')
+    sample_cnt = self.fpga.read_uint(self.vacc_n_framer_basename + self.packetizer_basename + 'cur_sample_cnt')
+    sysfreq    = self.fpga.read_uint(self.vacc_n_framer_basename + self.packetizer_basename + 'cur_sysfreq')
     return ts + float(sample_cnt) / (sysfreq+1)
                    
   @time.setter 
@@ -163,7 +164,7 @@ class sefram(object):
     Set timestamp for framer.
     if time == "now", set timestamp to next int(time.time())
     """
-    self.fpga.write_int(self.vacc_n_framer_basename+'pcktizer_timestamp_load', 0)
+    self.fpga.write_int(self.vacc_n_framer_basename + self.packetizer_basename + 'timestamp_load', 0)
     if value == "now":
       now = time.time()
       timestamp = int(now) + 1
@@ -173,20 +174,20 @@ class sefram(object):
     if before_half_second < 0:
        before_half_second += 1
     time.sleep(before_half_second)
-    self.fpga.write_int(self.vacc_n_framer_basename+'pcktizer_timestamp_init', timestamp, blindwrite=True)
-    self.fpga.write_int(self.vacc_n_framer_basename+'pcktizer_timestamp_load', 1)
+    self.fpga.write_int(self.vacc_n_framer_basename + self.packetizer_basename + 'timestamp_init', timestamp, blindwrite=True)
+    self.fpga.write_int(self.vacc_n_framer_basename + self.packetizer_basename + 'timestamp_load', 1)
 
   @property
   def IFG(self):
     """
     Set Inter Frame Gap used to send data by framer
     """
-    return self.fpga.read_uint(self.vacc_n_framer_basename+'pcktizer_IFG')
+    return self.fpga.read_uint(self.vacc_n_framer_basename + self.packetizer_basename + 'IFG')
 
   @IFG.setter 
   def IFG(self, value):
     self._IFG = value
-    self.fpga.write_int(self.vacc_n_framer_basename+'pcktizer_IFG', self._IFG)
+    self.fpga.write_int(self.vacc_n_framer_basename + self.packetizer_basename + 'IFG', self._IFG)
 
   def print_datarate(self):
     bytes_per_chunks = 4096+32
