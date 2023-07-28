@@ -30,6 +30,47 @@ TODO:
   - Need to improve fft area_group to make easier fits
 
 
+## 2023/07/28
+
+- Working on vhdl HB filter
+
+
+## 2023/07/04
+
+- roach2_tut_tge
+  - Succesfully configure gbe0 and gbe1 to stream data to each other.
+  - Succesfully configure gbe0 and gbe1 to stream data to themselves (loopback).
+
+- RFSoC4x2
+  - 100G network still not working
+  - Strange messages at compile
+    - Does the provided bitstream works on the board?
+  - HW Options (if this is a HW isse...):
+    - Buy Customized 100G QSFP28 Passive Loopback Testing Module -> https://www.fs.com/fr/products/75312.html?attribute=673&id=1777743  (45€) ???
+    - Buy fiber config advised by CASPER (https://casper-toolflow.readthedocs.io/projects/tutorials/en/latest/tutorials/rfsoc/tut_100g.html) (250€) ???
+      - generic compatible 100GBASE-SR4 module -> https://www.fs.com/products/75308.html
+      - MTP fiber cable -> https://www.fs.com/products/69009.html
+      - Mellanox Compatible 100GBASE-SR4 module -> https://www.fs.com/products/71009.html
+    - Buy Générique Compatible Module QSFP28 100GBASE-CWDM4 1310nm 2km DOM LC Duplex SMF -> https://www.fs.com/fr/products/75312.html?attribute=673&id=1777743 (189€) ???
+  - Draw enclosure
+  - Write mail to Mitch
+
+## 2023/06/27 -> 2023/07/03
+
+- roach2_tut_tge + RFSoC4x2
+  - Working with Nhung to understand transceiver issue on RFSoC4x2
+    - 2x Dell QSFP-100G-CWDM4 Compatible Module QSFP28 100GBASE-CWDM4 1310nm 2km DOM LC Duplex SMF -> https://www.fs.com/fr/products/65280.html
+  - 100G link never going up
+  - 100G tranceiver loopback on switch is ok
+  - Trying to do the same on RFSoC4x2
+  - Trying to do the same on roach2 to understant config scheme
+
+
+## 2023/06/26
+
+- Start looking into coding signal processing in VHDL and instanciate it in simulink design
+  - black_box_test.slx instanciates my_black_box.vhd as a black box.
+
 
 ## 2023/03/26
 
