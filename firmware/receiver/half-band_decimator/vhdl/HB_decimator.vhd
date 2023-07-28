@@ -40,7 +40,7 @@ ENTITY HB_decimator IS
     g_nof_data_path  : integer :=  2;  -- Number of channels (polarisations included)
     g_din_w          : integer := 18;
     g_din_dp         : integer := 17;
-    g_nof_mult_stage : integer :=  4;
+    g_nof_coef       : integer := -1;
     g_coef_list      : string  := "";
     g_coef_w         : integer := 18;
     g_coef_dp        : integer := 17;
@@ -63,40 +63,48 @@ ENTITY HB_decimator IS
     data_out_slv   : OUT std_logic_vector((g_nof_data_path * g_dout_w)-1 downto 0);
     data_out_valid : OUT std_logic
   );
+begin
+    -- Check that g_nof_coef = 3 + (2+2) * M;  -- 3 central coefficients + 2 0's + 2 non-zeros coefficients
+    assert (real(g_nof_coef) - 3.0) mod 4.0 = 0.0 report "g_nof_coef is NOT of the form 3 + (2+2) * M, with M in natural numbers" severity failure;
 END HB_decimator;
 
 ARCHITECTURE behavioral OF HB_decimator IS
-    type real_array is array(natural range <>) of real;
-    constant Nof_Coefficients : natural := 3 + g_nof_mult_stage * 4;  -- 3 central coefficients + 2 0's + 2 non-zeros coefficients
 
     constant sync_delay_value : natural := 100;  -- FIXME
     type sync_delay_t is array(sync_delay_value-1 downto 0) of std_logic;
     signal sync_delay_line : sync_delay_t := (others => '0');  -- no reset for this one
     signal got_sync        : std_logic;
-    
-    function ToRealArray(CoefficientsString : string; Nof_Coefficients : natural) return real_array is 
-        variable Coefficients : real_array(0 to Nof_Coefficients-1);
-	variable start_idx : natural := 1;
+
+    -- Convert g_coef_list string into a list of reals
+    type real_array is array(natural range <>) of real;
+
+    function ToRealArray(InputString : string) return real_array is 
+        constant c_max_nof_real : natural := InputString'length / 2;  -- at least one char and one space per real -> no need to allocate more space
+        variable reals : real_array(0 to c_max_nof_real-1);
+        variable nof_reals     : natural := 0;
+	    variable start_idx : natural := 1;
         variable end_idx : natural := 1;
     begin
-        for coef_idx in 0 to Nof_Coefficients-1 loop
+        while end_idx <= InputString'length loop
             -- search for separating space or end of string
-            while end_idx <= CoefficientsString'length loop
-                if CoefficientsString(end_idx) = ' ' then
+            while end_idx <= InputString'length loop
+                if InputString(end_idx) = ' ' then
                     exit;
                 end if;
                 end_idx := end_idx + 1;
             end loop;
 
-            Coefficients(coef_idx) := real'value(CoefficientsString(start_idx to end_idx-1));
+            reals(nof_reals) := real'value(InputString(start_idx to end_idx-1));
+            nof_reals := nof_reals + 1;
             start_idx := end_idx + 1;
             end_idx := start_idx + 1;
         end loop;
-	return Coefficients;
+	    return reals(0 to nof_reals-1);
     end ToRealArray;
 
-    constant CoefficientsReal : real_array(0 to Nof_Coefficients-1) := ToRealArray(g_coef_list, Nof_Coefficients);
+    constant CoefficientsReal : real_array := ToRealArray(g_coef_list);
 
+    -- Convert a list of reals into a list of signed
     type signed_array is array(natural range <>) of signed(g_coef_w-1 downto 0);
 
     function ToSignedArray(CoefficientsReal : real_array;
@@ -110,8 +118,9 @@ ARCHITECTURE behavioral OF HB_decimator IS
         return Coefficients;
     end ToSignedArray;
 
-    constant CoefficientsSigned : signed_array(0 to Nof_Coefficients-1) := ToSignedArray(CoefficientsReal, g_coef_w, g_coef_dp);
+    constant CoefficientsSigned : signed_array := ToSignedArray(CoefficientsReal, g_coef_w, g_coef_dp);
 
+    -- Signals used to demux the input streams
     type data_in_path_t is array(0 to g_nof_data_path-1) of signed(g_din_w-1 downto 0);
     signal data_in   : data_in_path_t;
     signal data_in_r : data_in_path_t;
@@ -131,6 +140,13 @@ BEGIN
 
     coef_test: process
     begin
+        assert CoefficientsSigned'length = g_nof_coef
+            report "g_coef_list """ & g_coef_list & """" &
+                   " doesn't contain the expected number of coefficients (g_nof_coef=" &
+                   integer'image(g_nof_coef) &
+                   ").  Found " & integer'image(CoefficientsSigned'length) & " reals in the list"
+            severity failure;
+        
         -- Print the converted real array to check the result
         for i in CoefficientsReal'range loop
             report "Coefficient(" & integer'image(i) & ") = "
@@ -190,7 +206,6 @@ BEGIN
             end if;
         end if;
     end process;
-
 
 
     data_out <= (others => (others => '0'));

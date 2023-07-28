@@ -38,7 +38,7 @@ ENTITY HB_decimator_tb IS
       g_nof_data_path  : integer :=  2;  -- Number of channels (polarisations included)
       g_din_w          : integer := 18;
       g_din_dp         : integer := 17;
-      g_nof_mult_stage : integer :=  4;
+      g_nof_coef       : integer := 19;
       g_coef_list      : string  := "-1 -0.1 0.1 0.999984741 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.10 0.11 0.12 0.13 0.14 0.15 0.16";
       g_coef_w         : integer := 18;
       g_coef_dp        : integer := 17;
@@ -152,7 +152,7 @@ BEGIN
       g_nof_data_path  => g_nof_data_path ,
       g_din_w          => g_din_w         ,
       g_din_dp         => g_din_dp        ,
-      g_nof_mult_stage => g_nof_mult_stage,
+      g_nof_coef       => g_nof_coef      ,
       g_coef_list      => g_coef_list     ,
       g_coef_w         => g_coef_w        ,
       g_coef_dp        => g_coef_dp       ,
