@@ -39,7 +39,9 @@ ENTITY HB_decimator_tb IS
       g_din_w          : integer := 18;
       g_din_dp         : integer := 17;
       g_nof_coef       : integer := 19;
-      g_coef_list      : string  := "-1 -0.1 0.1 0.999984741 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.10 0.11 0.12 0.13 0.14 0.15 0.16";
+--      g_coef_list      : string  := "0.0001 0 0.2 0 0.4 0 0.6 0 0.8 1 -0.8 0 -0.6 0 -0.4 0 -0.2 0 -0.0001";
+--      g_coef_list      : string  := "0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.10 0.11 0.12 0.13 0.14 0.15 0.16 0.17 0.18";
+      g_coef_list      : string  := "0.0001 0 0.2 0 0.4 0 0.6 0 0.8 1 0.8 0 0.6 0 0.4 0 0.2 0 0.0001";
       g_coef_w         : integer := 18;
       g_coef_dp        : integer := 17;
       g_acc_w          : integer := 48;
@@ -149,6 +151,7 @@ BEGIN
 
   uut: entity work.HB_decimator
     GENERIC MAP(
+      g_SIMULATION     => true            ,
       g_nof_data_path  => g_nof_data_path ,
       g_din_w          => g_din_w         ,
       g_din_dp         => g_din_dp        ,

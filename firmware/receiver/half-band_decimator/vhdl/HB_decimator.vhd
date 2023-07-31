@@ -37,6 +37,7 @@ use ieee.math_real.all;
 
 ENTITY HB_decimator IS
   GENERIC (
+    g_SIMULATION     : boolean := false;
     g_nof_data_path  : integer :=  2;  -- Number of channels (polarisations included)
     g_din_w          : integer := 18;
     g_din_dp         : integer := 17;
@@ -70,10 +71,12 @@ END HB_decimator;
 
 ARCHITECTURE behavioral OF HB_decimator IS
 
+    -- Delay line for Sync signal
     constant sync_delay_value : natural := 100;  -- FIXME
     type sync_delay_t is array(sync_delay_value-1 downto 0) of std_logic;
     signal sync_delay_line : sync_delay_t := (others => '0');  -- no reset for this one
     signal got_sync        : std_logic;
+
 
     -- Convert g_coef_list string into a list of reals
     type real_array is array(natural range <>) of real;
@@ -104,6 +107,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
 
     constant CoefficientsReal : real_array := ToRealArray(g_coef_list);
 
+
     -- Convert a list of reals into a list of signed
     type signed_array is array(natural range <>) of signed(g_coef_w-1 downto 0);
 
@@ -118,7 +122,9 @@ ARCHITECTURE behavioral OF HB_decimator IS
         return Coefficients;
     end ToSignedArray;
 
+    -- Filter coefficients: h[n], with n \in [0, g_nof_coef[
     constant CoefficientsSigned : signed_array := ToSignedArray(CoefficientsReal, g_coef_w, g_coef_dp);
+
 
     -- Signals used to demux the input streams
     type data_in_path_t is array(0 to g_nof_data_path-1) of signed(g_din_w-1 downto 0);
@@ -131,7 +137,13 @@ ARCHITECTURE behavioral OF HB_decimator IS
     signal odd_sample           : std_logic;
 
 
-
+    -- Constant and signals for subfilters (see ../design/AMD_FIR_Compiler_Half-Band_Decimator.pdf for notations)
+    --   Top arm: h_0[n] = a_0, a_2, a_4, ... a_(2i)
+    --     Since filter coefficients are symetrical, we use a pre-adder structure to save multipliers
+    --   Bottom arm: h_1[n] = 0, 0, ..., 1, ..., 0, 0
+    -- Top arm computations:
+    
+    -- Bottom arm computations:
 
     type data_out_path_t is array(0 to g_nof_data_path-1) of signed(g_dout_w-1 downto 0);
     signal data_out : data_out_path_t;
@@ -139,20 +151,51 @@ ARCHITECTURE behavioral OF HB_decimator IS
 BEGIN
 
     coef_test: process
+        constant central_coef_idx : natural := (CoefficientsReal'length-1)/2;
+        variable my_severity : severity_level := failure;
     begin
+        if g_SIMULATION then
+            my_severity := warning;
+        end if;
+
         assert CoefficientsSigned'length = g_nof_coef
             report "g_coef_list """ & g_coef_list & """" &
                    " doesn't contain the expected number of coefficients (g_nof_coef=" &
                    integer'image(g_nof_coef) &
                    ").  Found " & integer'image(CoefficientsSigned'length) & " reals in the list"
-            severity failure;
+            severity my_severity;
         
         -- Print the converted real array to check the result
         for i in CoefficientsReal'range loop
-            report "Coefficient(" & integer'image(i) & ") = "
+            report  "Real to signed conversion check:  "
+                    & "Coefficient(" & integer'image(i) & ") = "
                     & real'image(CoefficientsReal(i)) & " (real) = " 
                     & integer'image(to_integer(CoefficientsSigned(i))) & " (signed Q(" & integer'image(g_coef_w) & "," & integer'image(g_coef_dp) & "))";
         end loop;
+
+        -- Check that filter is symetrical
+        for i in 0 to central_coef_idx-1 loop
+            assert CoefficientsReal(i) = CoefficientsReal(CoefficientsReal'length - 1 - i)
+                report "Filter symetry check:  "
+                       & "h[" & integer'image(i) & "] != h[" & integer'image(CoefficientsReal'length - 1 - i) & "]"
+                       & "  ->  " & real'image(CoefficientsReal(i)) & " != " & real'image(CoefficientsReal(CoefficientsReal'length - 1 - i))
+                severity my_severity;
+        end loop;
+
+        for i in CoefficientsReal'range loop
+            if i = central_coef_idx then  -- Check that central coefficent is 1
+                assert CoefficientsReal(i) = 1.0
+                    report "Central coef value check:  "
+                           & "h[" & integer'image(i) & "] = " & real'image(CoefficientsReal(i)) & " != 1.0"
+                    severity my_severity;
+            elsif (i mod 2) = 1 then  -- Check that odd coefficients are 0.0 (except central one)
+                assert CoefficientsReal(i) = 0.0
+                    report "Odd coefficients should be 0.0:  "
+                           & "h[" & integer'image(i) & "] = " & real'image(CoefficientsReal(i))
+                    severity my_severity;
+            end if;
+        end loop;
+
         wait;
     end process;
 
@@ -206,6 +249,11 @@ BEGIN
             end if;
         end if;
     end process;
+
+
+
+
+
 
 
     data_out <= (others => (others => '0'));
