@@ -254,7 +254,7 @@ BEGIN
 
     p_din_demux: process(clk, rst)
     begin
-        if rst = '1' or sync_in = '1'then
+        if rst = '1' then
             odd_sample <= '0';
             data_in_r <= (others => (others => '0'));
             data_in_demuxed <= (others => (others => (others => '0')));
