@@ -141,14 +141,25 @@ ARCHITECTURE behavioral OF HB_decimator IS
     --   Top arm: h_0[n] = a_0, a_2, a_4, ... a_(2i)
     --     Since filter coefficients are symetrical, we use a pre-adder structure to save multipliers
     --   Bottom arm: h_1[n] = 0, 0, ..., 1, ..., 0, 0
+ 
     -- Top arm computations:
+    constant c_top_delay_line_length : natural := (g_nof_coef-1)/2;
+    type top_delay_line_t is array(0 to c_top_delay_line_length-1) of data_in_path_t;
+    signal top_delay_line : top_delay_line_t;
+
     constant c_nof_mult     : natural := (g_nof_coef+1)/4;
-    type pre_adders_t is array(0 to g_nof_data_path-1, 0 to c_nof_mult-1) of signed(g_din_w+1-1 downto 0);
+
+    type pre_adders_path_t is array(0 to g_nof_data_path-1) of signed(g_din_w+1-1          downto 0);
+    type mults_path_t      is array(0 to g_nof_data_path-1) of signed(g_din_w+1+g_coef_w-1 downto 0);
+    type accs_path_t       is array(0 to g_nof_data_path-1) of signed(g_acc_w-1            downto 0);
+    
+    type pre_adders_t is array(0 to c_nof_mult-1) of pre_adders_path_t;
+    type mults_t      is array(0 to c_nof_mult-1) of mults_path_t;
+    type accs_t       is array(0 to c_nof_mult-1) of accs_path_t;
+    
     signal pre_adders : pre_adders_t;
-    type mults_t is array(0 to g_nof_data_path-1, 0 to c_nof_mult-1) of signed(g_din_w+1+g_coef_w-1 downto 0);
-    signal mults : mults_t;
-    type accs_t is array(0 to g_nof_data_path-1, 0 to c_nof_mult-1) of signed(g_acc_w-1 downto 0);
-    signal accs : accs_t;
+    signal mults      : mults_t;
+    signal accs       : accs_t;
 
     function getTopArmCoefficients(CoefficientsSigned : real_array) return real_array is 
         constant nof_top_coef : natural := (CoefficientsSigned'length + 1)/4;
@@ -168,10 +179,12 @@ ARCHITECTURE behavioral OF HB_decimator IS
     -- Bottom arm is a simple delay line of length of half the bottom arm filter to feed a multiplication by the central coefficient (1.0, no DSP for that)
     constant c_central_coef_idx : natural := (g_nof_coef-1)/2;
     -- The delay line length is
-    constant c_bottom_delay_line_length : natural := (g_nof_coef-3)/4;
-    type bottom_delay_line_t is array(0 to g_nof_data_path-1, 0 to c_bottom_delay_line_length-1) of signed(g_acc_w-1 downto 0);
+    constant c_bottom_delay_line_length : natural := (g_nof_coef-3)/4 + 1 + 1;  -- +1 to compensate pre-adders located in top branch and +1 for adders after mult
+    type bottom_delay_line_t is array(0 to c_bottom_delay_line_length-1) of data_in_path_t;
     signal bottom_delay_line : bottom_delay_line_t;
 
+    signal bottom_out : accs_path_t;
+    signal filter_out : accs_path_t;
 
     type data_out_path_t is array(0 to g_nof_data_path-1) of signed(g_dout_w-1 downto 0);
     signal data_out : data_out_path_t;
@@ -261,9 +274,8 @@ BEGIN
         elsif rising_edge(clk) then
             data_in_demuxed_valid <= '0';
             if data_in_valid = '1' then
-                if odd_sample = '0' then
-                    data_in_r <= data_in;
-                else
+                data_in_r <= data_in;
+                if odd_sample = '1' then
                     data_in_demuxed <= data_in_r & data_in;
                     data_in_demuxed_valid <= '1';
                 end if;
@@ -278,13 +290,92 @@ BEGIN
     end process;
 
 
+    p_both_arm_filters: process(clk, rst)
+    begin
+        if rst = '1' then
+            if g_SIMULATION then  -- do NOT reset delay lines for synthesis (SRL16 optimization)
+                top_delay_line <= (others => (others => (others => '0')));
+                bottom_delay_line <= (others => (others => (others => '0')));
+            end if;
+            pre_adders <= (others => (others => (others => '0')));
+            mults      <= (others => (others => (others => '0')));
+            accs       <= (others => (others => (others => '0')));
+            bottom_out <= (others => (others => '0'));
+            filter_out <= (others => (others => '0'));
+            data_out   <= (others => (others => '0'));
+            data_out_valid <= '0';
+        elsif rising_edge(clk) then
+            data_out_valid <= '0';
+            if data_in_demuxed_valid = '1' then
+              -- top branch filter
+                -- delay line
+                top_delay_line    <= data_in_demuxed(0) &    top_delay_line(0 to c_top_delay_line_length   -2);
+                
+                -- pre_adder
+                for data_path_idx in 0 to g_nof_data_path-1 loop
+                    pre_adders(0)(data_path_idx) <= resize(data_in_demuxed(0)(data_path_idx), g_din_w+1)
+                                                  + resize(top_delay_line(c_top_delay_line_length-1)(data_path_idx), g_din_w+1);
+                    for pre_adder_idx in 1 to c_nof_mult-1 loop
+                        pre_adders(pre_adder_idx)(data_path_idx) <= resize(top_delay_line(pre_adder_idx)(data_path_idx), g_din_w+1)
+                                                                  + resize(top_delay_line(c_top_delay_line_length-1-pre_adder_idx)(data_path_idx), g_din_w+1);
+                    end loop;
+                end loop;
 
+                -- coef multiply
+                for data_path_idx in 0 to g_nof_data_path-1 loop
+                    for mult_idx in 0 to c_nof_mult-1 loop
+                        mults(mult_idx)(data_path_idx) <= c_TopArmCoefficientsSigned(mult_idx) * pre_adders(mult_idx)(data_path_idx);
+                    end loop;    
+                end loop;
+ 
+                -- adders/accumulator
+                for data_path_idx in 0 to g_nof_data_path-1 loop
+                    -- accs(0)(data_path_idx) <= ;  NOT USED
+                    accs(1)(data_path_idx) <= resize(mults(0)(data_path_idx), g_acc_w)
+                                            + resize(mults(1)(data_path_idx), g_acc_w); 
+                    for accs_idx in 2 to c_nof_mult-1 loop
+                        accs(accs_idx)(data_path_idx) <=         accs(accs_idx-1)(data_path_idx)
+                                                       + resize(mults(  accs_idx)(data_path_idx), g_acc_w);
+                    end loop;    
+                end loop;   
 
+              -- bottom branch filter
+                -- delay line
+                bottom_delay_line <= data_in_demuxed(1) & bottom_delay_line(0 to c_bottom_delay_line_length-2);
 
+                -- 1.0 coef multiply 
+                for data_path_idx in 0 to g_nof_data_path-1 loop
+                    bottom_out(data_path_idx) <= shift_left(resize(bottom_delay_line(c_bottom_delay_line_length-1)(data_path_idx), g_acc_w), g_coef_dp);
+                end loop;
 
+              -- Merge both branches
+                for data_path_idx in 0 to g_nof_data_path-1 loop
+                    filter_out(data_path_idx) <= accs(c_nof_mult-1)(data_path_idx) + bottom_out(data_path_idx);
+                end loop;
 
-    data_out <= (others => (others => '0'));
-    data_out_valid <= '0';
+              -- Convert to output format
+                for data_path_idx in 0 to g_nof_data_path-1 loop
+                    data_out(data_path_idx) <= resize( shift_right(filter_out(data_path_idx), g_acc_dp-g_dout_dp), g_dout_w);
+                end loop;
+                data_out_valid <= '1';
+
+            end if;
+            if sync_in = '1' then
+                if g_SIMULATION then  -- do NOT reset delay lines for synthesis
+                    top_delay_line <= (others => (others => (others => '0')));
+                    bottom_delay_line <= (others => (others => (others => '0')));
+                end if;
+                pre_adders <= (others => (others => (others => '0')));
+                mults      <= (others => (others => (others => '0')));
+                accs       <= (others => (others => (others => '0')));
+                bottom_out <= (others => (others => '0'));
+                filter_out <= (others => (others => '0'));
+                data_out   <= (others => (others => '0'));
+                data_out_valid <= '0';
+                end if;
+        end if;
+    end process;
+
 
     p_data_out_signed2slv: process(data_out)
     begin
