@@ -73,7 +73,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
 
     -- Delay line for Sync signal
     constant c_sync_delay_value : natural := 100;  -- FIXME
-    type sync_delay_t is array(sync_delay_value-1 downto 0) of std_logic;
+    type sync_delay_t is array(c_sync_delay_value-1 downto 0) of std_logic;
     signal sync_delay_line : sync_delay_t := (others => '0');  -- no reset for this one
     signal got_sync        : std_logic;
 
@@ -142,8 +142,36 @@ ARCHITECTURE behavioral OF HB_decimator IS
     --     Since filter coefficients are symetrical, we use a pre-adder structure to save multipliers
     --   Bottom arm: h_1[n] = 0, 0, ..., 1, ..., 0, 0
     -- Top arm computations:
+    constant c_nof_mult     : natural := (g_nof_coef+1)/4;
+    type pre_adders_t is array(0 to g_nof_data_path-1, 0 to c_nof_mult-1) of signed(g_din_w+1-1 downto 0);
+    signal pre_adders : pre_adders_t;
+    type mults_t is array(0 to g_nof_data_path-1, 0 to c_nof_mult-1) of signed(g_din_w+1+g_coef_w-1 downto 0);
+    signal mults : mults_t;
+    type accs_t is array(0 to g_nof_data_path-1, 0 to c_nof_mult-1) of signed(g_acc_w-1 downto 0);
+    signal accs : accs_t;
+
+    function getTopArmCoefficients(CoefficientsSigned : real_array) return real_array is 
+        constant nof_top_coef : natural := (CoefficientsSigned'length + 1)/4;
+        variable Coefficients : real_array(0 to nof_top_coef-1);
+    begin
+	    for coef_idx in Coefficients'range loop
+            Coefficients(coef_idx) := CoefficientsSigned(2 * coef_idx);
+        end loop;
+        return Coefficients;
+    end getTopArmCoefficients;
+
+    constant c_TopArmCoefficientsReal : real_array(0 to c_nof_mult-1) := getTopArmCoefficients(c_CoefficientsReal);
+    constant c_TopArmCoefficientsSigned : signed_array(0 to c_nof_mult-1) := ToSignedArray(c_TopArmCoefficientsReal, g_coef_w, g_coef_dp);
+   
     
     -- Bottom arm computations:
+    -- Bottom arm is a simple delay line of length of half the bottom arm filter to feed a multiplication by the central coefficient (1.0, no DSP for that)
+    constant c_central_coef_idx : natural := (g_nof_coef-1)/2;
+    -- The delay line length is
+    constant c_bottom_delay_line_length : natural := (g_nof_coef-3)/4;
+    type bottom_delay_line_t is array(0 to g_nof_data_path-1, 0 to c_bottom_delay_line_length-1) of signed(g_acc_w-1 downto 0);
+    signal bottom_delay_line : bottom_delay_line_t;
+
 
     type data_out_path_t is array(0 to g_nof_data_path-1) of signed(g_dout_w-1 downto 0);
     signal data_out : data_out_path_t;
@@ -151,7 +179,6 @@ ARCHITECTURE behavioral OF HB_decimator IS
 BEGIN
 
     coef_test: process
-        constant central_coef_idx : natural := (CoefficientsReal'length-1)/2;
         variable my_severity : severity_level := failure;
     begin
         if g_SIMULATION then
@@ -169,22 +196,22 @@ BEGIN
         for i in c_CoefficientsReal'range loop
             report  "Real to signed conversion check:  "
                     & "Coefficient(" & integer'image(i) & ") = "
-                    & real'image(CoefficientsReal(i)) & " (real) = " 
+                    & real'image(c_CoefficientsReal(i)) & " (real) = " 
                     & integer'image(to_integer(c_CoefficientsSigned(i))) & " (signed Q(" & integer'image(g_coef_w) & "," & integer'image(g_coef_dp) & "))";
         end loop;
 
         -- Check that filter is symetrical
         for i in 0 to c_central_coef_idx-1 loop
-            assert CoefficientsReal(i) = CoefficientsReal(CoefficientsReal'length - 1 - i)
+            assert c_CoefficientsReal(i) = c_CoefficientsReal(g_nof_coef - 1 - i)
                 report "Filter symetry check:  "
-                       & "h[" & integer'image(i) & "] != h[" & integer'image(CoefficientsReal'length - 1 - i) & "]"
+                       & "h[" & integer'image(i) & "] != h[" & integer'image(g_nof_coef - 1 - i) & "]"
                        & "  ->  " & real'image(c_CoefficientsReal(i)) & " != " & real'image(c_CoefficientsReal(g_nof_coef - 1 - i))
                 severity my_severity;
         end loop;
 
-        for i in CoefficientsReal'range loop
+        for i in c_CoefficientsReal'range loop
             if i = c_central_coef_idx then  -- Check that central coefficent is 1
-                assert CoefficientsReal(i) = 1.0
+                assert c_CoefficientsReal(i) = 1.0
                     report "Central coef value check:  "
                            & "h[" & integer'image(i) & "] = " & real'image(c_CoefficientsReal(i)) & " != 1.0"
                     severity my_severity;
