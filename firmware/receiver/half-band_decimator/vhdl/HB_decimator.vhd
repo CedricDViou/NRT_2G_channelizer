@@ -178,7 +178,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
 
 BEGIN
 
-    coef_test: process
+    p_coef_test: process
         variable my_severity : severity_level := failure;
     begin
         if g_SIMULATION then
@@ -227,7 +227,7 @@ BEGIN
     end process;
 
 
-    sync_delay: process(clk)
+    p_sync_delay: process(clk, rst)
     begin
         if rst = '1' then
             got_sync <= '0';
@@ -245,14 +245,14 @@ BEGIN
 
 
 
-    data_in_slv2signed: process(data_in_slv)
+    p_data_in_slv2signed: process(data_in_slv)
     begin
         for dp_idx in 0 to g_nof_data_path-1 loop
             data_in(dp_idx) <= signed(data_in_slv(((dp_idx+1)*g_din_w)-1 downto dp_idx*g_din_w));
         end loop;
     end process;
 
-    din_demux: process(clk)
+    p_din_demux: process(clk, rst)
     begin
         if rst = '1' or sync_in = '1'then
             odd_sample <= '0';
@@ -286,7 +286,7 @@ BEGIN
     data_out <= (others => (others => '0'));
     data_out_valid <= '0';
 
-    data_out_signed2slv: process(data_out)
+    p_data_out_signed2slv: process(data_out)
     begin
         for dp_idx in 0 to g_nof_data_path-1 loop
             data_out_slv(((dp_idx+1)*g_din_w)-1 downto dp_idx*g_din_w) <= std_logic_vector(data_out(dp_idx));
