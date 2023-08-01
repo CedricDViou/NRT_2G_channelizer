@@ -72,7 +72,7 @@ END HB_decimator;
 ARCHITECTURE behavioral OF HB_decimator IS
 
     -- Delay line for Sync signal
-    constant sync_delay_value : natural := 100;  -- FIXME
+    constant c_sync_delay_value : natural := 100;  -- FIXME
     type sync_delay_t is array(sync_delay_value-1 downto 0) of std_logic;
     signal sync_delay_line : sync_delay_t := (others => '0');  -- no reset for this one
     signal got_sync        : std_logic;
@@ -105,7 +105,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
 	    return reals(0 to nof_reals-1);
     end ToRealArray;
 
-    constant CoefficientsReal : real_array := ToRealArray(g_coef_list);
+    constant c_CoefficientsReal : real_array := ToRealArray(g_coef_list);
 
 
     -- Convert a list of reals into a list of signed
@@ -123,7 +123,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
     end ToSignedArray;
 
     -- Filter coefficients: h[n], with n \in [0, g_nof_coef[
-    constant CoefficientsSigned : signed_array := ToSignedArray(CoefficientsReal, g_coef_w, g_coef_dp);
+    constant c_CoefficientsSigned : signed_array := ToSignedArray(c_CoefficientsReal, g_coef_w, g_coef_dp);
 
 
     -- Signals used to demux the input streams
@@ -158,40 +158,40 @@ BEGIN
             my_severity := warning;
         end if;
 
-        assert CoefficientsSigned'length = g_nof_coef
+        assert c_CoefficientsSigned'length = g_nof_coef
             report "g_coef_list """ & g_coef_list & """" &
                    " doesn't contain the expected number of coefficients (g_nof_coef=" &
                    integer'image(g_nof_coef) &
-                   ").  Found " & integer'image(CoefficientsSigned'length) & " reals in the list"
+                   ").  Found " & integer'image(c_CoefficientsSigned'length) & " reals in the list"
             severity my_severity;
         
         -- Print the converted real array to check the result
-        for i in CoefficientsReal'range loop
+        for i in c_CoefficientsReal'range loop
             report  "Real to signed conversion check:  "
                     & "Coefficient(" & integer'image(i) & ") = "
                     & real'image(CoefficientsReal(i)) & " (real) = " 
-                    & integer'image(to_integer(CoefficientsSigned(i))) & " (signed Q(" & integer'image(g_coef_w) & "," & integer'image(g_coef_dp) & "))";
+                    & integer'image(to_integer(c_CoefficientsSigned(i))) & " (signed Q(" & integer'image(g_coef_w) & "," & integer'image(g_coef_dp) & "))";
         end loop;
 
         -- Check that filter is symetrical
-        for i in 0 to central_coef_idx-1 loop
+        for i in 0 to c_central_coef_idx-1 loop
             assert CoefficientsReal(i) = CoefficientsReal(CoefficientsReal'length - 1 - i)
                 report "Filter symetry check:  "
                        & "h[" & integer'image(i) & "] != h[" & integer'image(CoefficientsReal'length - 1 - i) & "]"
-                       & "  ->  " & real'image(CoefficientsReal(i)) & " != " & real'image(CoefficientsReal(CoefficientsReal'length - 1 - i))
+                       & "  ->  " & real'image(c_CoefficientsReal(i)) & " != " & real'image(c_CoefficientsReal(g_nof_coef - 1 - i))
                 severity my_severity;
         end loop;
 
         for i in CoefficientsReal'range loop
-            if i = central_coef_idx then  -- Check that central coefficent is 1
+            if i = c_central_coef_idx then  -- Check that central coefficent is 1
                 assert CoefficientsReal(i) = 1.0
                     report "Central coef value check:  "
-                           & "h[" & integer'image(i) & "] = " & real'image(CoefficientsReal(i)) & " != 1.0"
+                           & "h[" & integer'image(i) & "] = " & real'image(c_CoefficientsReal(i)) & " != 1.0"
                     severity my_severity;
             elsif (i mod 2) = 1 then  -- Check that odd coefficients are 0.0 (except central one)
-                assert CoefficientsReal(i) = 0.0
+                assert c_CoefficientsReal(i) = 0.0
                     report "Odd coefficients should be 0.0:  "
-                           & "h[" & integer'image(i) & "] = " & real'image(CoefficientsReal(i))
+                           & "h[" & integer'image(i) & "] = " & real'image(c_CoefficientsReal(i))
                     severity my_severity;
             end if;
         end loop;
@@ -206,7 +206,7 @@ BEGIN
             got_sync <= '0';
         elsif rising_edge(clk) then
             if data_in_valid = '1' then
-                sync_delay_line <= got_sync & sync_delay_line(sync_delay_value-1 downto 1);
+                sync_delay_line <= got_sync & sync_delay_line(c_sync_delay_value-1 downto 1);
                 got_sync <= '0';
             end if;
             if sync_in = '1' then
