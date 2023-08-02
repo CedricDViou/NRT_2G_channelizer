@@ -23,7 +23,7 @@
 -- Author: Cedric Viou (cedric.viou@obs-nancay.fr)
 --
 -- Description: Half-band decimator filter
--- 
+--
 --
 -------------------------------------------------------------------------------
 
@@ -45,10 +45,10 @@ ENTITY HB_decimator_tb IS
       g_coef_w         : integer := 18;
       g_coef_dp        : integer := 17;
       g_acc_w          : integer := 48;
-      g_acc_dp         : integer := 40;
-      g_dout_w         : integer := 18;                             
+      g_acc_dp         : integer := 34;
+      g_dout_w         : integer := 18;
       g_dout_dp        : integer := 17
-  );                             
+  );
 END HB_decimator_tb;
 
 ARCHITECTURE behavioral OF HB_decimator_tb IS
@@ -120,7 +120,7 @@ BEGIN
     -- x = np.arange(1, 0x100, dtype=np.int64).reshape((-1,1))
     -- x = np.hstack((x, x + 0x100))
     -- np.savetxt('counter.txt', x, fmt='%10d')
-    
+
     -- file_open(fstatus, input_file, "../design/noise_and_2_lines_input.txt", read_mode);
 
     wait until sync_in = '1' and rising_edge(clk);
@@ -162,7 +162,7 @@ BEGIN
       g_acc_w          => g_acc_w         ,
       g_acc_dp         => g_acc_dp        ,
       g_dout_w         => g_dout_w        ,
-      g_dout_dp        => g_dout_dp       
+      g_dout_dp        => g_dout_dp
     )
     PORT MAP(
       rst            => rst           ,

@@ -23,7 +23,7 @@
 -- Author: Cedric Viou (cedric.viou@obs-nancay.fr)
 --
 -- Description: Half-band decimator filter
--- 
+--
 --
 -------------------------------------------------------------------------------
 
@@ -64,10 +64,10 @@ ENTITY HB_decimator IS
     rst            : IN  std_logic := '0';
     clk            : IN  std_logic;
     ce             : IN  std_logic;
-  
+
     sync_in        : IN  std_logic;  -- used as reset in CASPER toolflow
     sync_out       : OUT std_logic;
-    
+
     data_in_slv    : IN  std_logic_vector((g_nof_data_path * g_din_w)-1 downto 0);
     data_in_valid  : IN  std_logic;
 
@@ -91,7 +91,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
     -- Convert g_coef_list string into a list of reals
     type real_array is array(natural range <>) of real;
 
-    function ToRealArray(InputString : string) return real_array is 
+    function ToRealArray(InputString : string) return real_array is
         constant c_max_nof_real : natural := InputString'length / 2;  -- at least one char and one space per real -> no need to allocate more space
         variable reals : real_array(0 to c_max_nof_real-1);
         variable nof_reals     : natural := 0;
@@ -123,7 +123,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
 
     function ToSignedArray(CoefficientsReal : real_array;
                            coef_w : natural;
-                           coef_dp : natural) return signed_array is 
+                           coef_dp : natural) return signed_array is
         variable Coefficients : signed_array(CoefficientsReal'range);
     begin
 	    for coef_idx in CoefficientsReal'range loop
@@ -151,7 +151,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
     --   Top arm: h_0[n] = a_0, a_2, a_4, ... a_(2i)
     --     Since filter coefficients are symetrical, we use a pre-adder structure to save multipliers
     --   Bottom arm: h_1[n] = 0, 0, ..., 1, ..., 0, 0
- 
+
     -- Top arm computations:
     constant c_top_delay_line_length : natural := (g_nof_coef-1)/2;
     type top_delay_line_t is array(0 to c_top_delay_line_length-1) of data_in_path_t;
@@ -162,16 +162,16 @@ ARCHITECTURE behavioral OF HB_decimator IS
     type pre_adders_path_t is array(0 to g_nof_data_path-1) of signed(g_din_w+1-1          downto 0);
     type mults_path_t      is array(0 to g_nof_data_path-1) of signed(g_din_w+1+g_coef_w-1 downto 0);
     type accs_path_t       is array(0 to g_nof_data_path-1) of signed(g_acc_w-1            downto 0);
-    
+
     type pre_adders_t is array(0 to c_nof_mult-1) of pre_adders_path_t;
     type mults_t      is array(0 to c_nof_mult-1) of mults_path_t;
     type accs_t       is array(0 to c_nof_mult-1) of accs_path_t;
-    
+
     signal pre_adders : pre_adders_t;
     signal mults      : mults_t;
     signal accs       : accs_t;
 
-    function getTopArmCoefficients(CoefficientsSigned : real_array) return real_array is 
+    function getTopArmCoefficients(CoefficientsSigned : real_array) return real_array is
         constant nof_top_coef : natural := (CoefficientsSigned'length + 1)/4;
         variable Coefficients : real_array(0 to nof_top_coef-1);
     begin
@@ -183,8 +183,8 @@ ARCHITECTURE behavioral OF HB_decimator IS
 
     constant c_TopArmCoefficientsReal : real_array(0 to c_nof_mult-1) := getTopArmCoefficients(c_CoefficientsReal);
     constant c_TopArmCoefficientsSigned : signed_array(0 to c_nof_mult-1) := ToSignedArray(c_TopArmCoefficientsReal, g_coef_w, g_coef_dp);
-   
-    
+
+
     -- Bottom arm computations:
     -- Bottom arm is a simple delay line of length of half the bottom arm filter to feed a multiplication by the central coefficient (1.0, no DSP for that)
     constant c_central_coef_idx : natural := (g_nof_coef-1)/2;
@@ -214,12 +214,12 @@ BEGIN
                    integer'image(g_nof_coef) &
                    ").  Found " & integer'image(c_CoefficientsSigned'length) & " reals in the list"
             severity my_severity;
-        
+
         -- Print the converted real array to check the result
         for i in c_CoefficientsReal'range loop
             report  "Real to signed conversion check:  "
                     & "Coefficient(" & integer'image(i) & ") = "
-                    & real'image(c_CoefficientsReal(i)) & " (real) = " 
+                    & real'image(c_CoefficientsReal(i)) & " (real) = "
                     & integer'image(to_integer(c_CoefficientsSigned(i))) & " (signed Q(" & integer'image(g_coef_w) & "," & integer'image(g_coef_dp) & "))";
         end loop;
 
@@ -320,7 +320,7 @@ BEGIN
               -- top branch filter
                 -- delay line
                 top_delay_line    <= data_in_demuxed(0) &    top_delay_line(0 to c_top_delay_line_length   -2);
-                
+
                 -- pre_adder
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     pre_adders(0)(data_path_idx) <= resize(data_in_demuxed(0)(data_path_idx), g_din_w+1)
@@ -335,25 +335,25 @@ BEGIN
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     for mult_idx in 0 to c_nof_mult-1 loop
                         mults(mult_idx)(data_path_idx) <= c_TopArmCoefficientsSigned(mult_idx) * pre_adders(mult_idx)(data_path_idx);
-                    end loop;    
+                    end loop;
                 end loop;
- 
+
                 -- adders/accumulator
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     -- accs(0)(data_path_idx) <= ;  NOT USED
                     accs(1)(data_path_idx) <= resize(mults(0)(data_path_idx), g_acc_w)
-                                            + resize(mults(1)(data_path_idx), g_acc_w); 
+                                            + resize(mults(1)(data_path_idx), g_acc_w);
                     for accs_idx in 2 to c_nof_mult-1 loop
                         accs(accs_idx)(data_path_idx) <=         accs(accs_idx-1)(data_path_idx)
                                                        + resize(mults(  accs_idx)(data_path_idx), g_acc_w);
-                    end loop;    
-                end loop;   
+                    end loop;
+                end loop;
 
               -- bottom branch filter
                 -- delay line
                 bottom_delay_line <= data_in_demuxed(1) & bottom_delay_line(0 to c_bottom_delay_line_length-2);
 
-                -- 1.0 coef multiply 
+                -- 1.0 coef multiply
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     bottom_out(data_path_idx) <= shift_left(resize(bottom_delay_line(c_bottom_delay_line_length-1)(data_path_idx), g_acc_w), g_coef_dp);
                 end loop;
@@ -363,7 +363,7 @@ BEGIN
                     filter_out(data_path_idx) <= accs(c_nof_mult-1)(data_path_idx) + bottom_out(data_path_idx);
                 end loop;
 
-              -- Convert to output format
+              -- Convert to output format (simple truncation for now)
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     data_out(data_path_idx) <= resize( shift_right(filter_out(data_path_idx), g_acc_dp-g_dout_dp), g_dout_w);
                 end loop;
