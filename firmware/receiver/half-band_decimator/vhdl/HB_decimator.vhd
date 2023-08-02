@@ -46,9 +46,19 @@ ENTITY HB_decimator IS
     g_coef_w         : integer := 18;
     g_coef_dp        : integer := 17;
     g_acc_w          : integer := 48;
-    g_acc_dp         : integer := 40;
-    g_dout_w         : integer := 18;                             
-    g_dout_dp        : integer := 17                             
+    g_acc_dp         : integer := 34;
+    g_dout_w         : integer := 18;
+    g_dout_dp        : integer := 17
+
+    -- generated with ../design/quantif_analysis.py
+    --                    11111                   1111111111222222222233333 
+    --                    43210987654321.1234567890123456789012345678901234 
+    -- din     Q(18,17): |             _._________________                 |
+    -- pre_add Q(19,17): |            __._________________                 |
+    -- coef    Q(20,17): |           ___._________________                 |
+    -- mult    Q(39,34): |         _____.__________________________________|
+    -- acc     Q(48,34): |______________.__________________________________|
+    -- dout    Q(18,17): |             _._________________                 |
   );
   PORT (
     rst            : IN  std_logic := '0';
