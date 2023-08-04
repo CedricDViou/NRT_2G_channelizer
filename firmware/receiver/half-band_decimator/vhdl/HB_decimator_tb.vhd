@@ -38,10 +38,11 @@ ENTITY HB_decimator_tb IS
       g_nof_data_path  : integer :=  2;  -- Number of channels (polarisations included)
       g_din_w          : integer := 18;
       g_din_dp         : integer := 17;
-      g_nof_coef       : integer := 19;
---      g_coef_list      : string  := "0.0001 0 0.2 0 0.4 0 0.6 0 0.8 1 -0.8 0 -0.6 0 -0.4 0 -0.2 0 -0.0001";
---      g_coef_list      : string  := "0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.10 0.11 0.12 0.13 0.14 0.15 0.16 0.17 0.18";
-      g_coef_list      : string  := "0.0001 0 0.2 0 0.4 0 0.6 0 0.8 1 0.8 0 0.6 0 0.4 0 0.2 0 0.0001";
+      -- g_nof_coef       : integer := 19;
+      -- g_coef_list      : string  := "0.1 0 0.2 0 0.3 0 0.4 0 0.5 1 0.5 0 0.4 0 0.3 0 0.2 0 0.1";
+      g_nof_coef       : integer := 31;
+      g_coef_list      : string  := "-0.02042164195569297 0.0 0.021396144436032084 0.0 -0.032582969628165405 0.0 0.04881337668760024 0.0 -0.07289651356672325 0.0 0.11403737851469356 0.0 -0.20392412953192168 0.0 0.633900772734172 1.0 0.633900772734172 0.0 -0.20392412953192168 0.0 0.11403737851469356 0.0 -0.07289651356672325 0.0 0.04881337668760024 0.0 -0.032582969628165405 0.0 0.021396144436032084 0.0 -0.02042164195569297";
+      -- g_coef_list      : string  := "0.1 0.0 0.2 0.0 0.3 0.0 0.4 0.0 0.5 0.0 0.6 0.0 0.7 0.0 0.8 1.0 0.8 0.0 0.7 0.0 0.6 0.0 0.5 0.0 0.4 0.0 0.3 0.0 0.2 0.0 0.1";
       g_coef_w         : integer := 18;
       g_coef_dp        : integer := 17;
       g_acc_w          : integer := 48;
@@ -64,6 +65,7 @@ ARCHITECTURE behavioral OF HB_decimator_tb IS
   signal data_in        : std_logic_vector((g_nof_data_path * g_din_w)-1 downto 0);
   signal data_in_valid  : std_logic;
   signal RANDOM_DV_IN   : boolean := False;   -- Random pause between single datavalid
+  constant INJECT_DIRAC : boolean := False;   -- Starts injecting Dirac pulses to test impulse response first.
 
 
   signal data_out       : std_logic_vector((g_nof_data_path * g_dout_w)-1 downto 0);
@@ -103,7 +105,7 @@ BEGIN
     wait;
   end process;
 
-  RANDOM_DV_IN <= False, True after 1 us;
+  RANDOM_DV_IN <= False; --, True after 1 us;
 
   data_in_source: process
     file input_file : TEXT;
@@ -115,16 +117,71 @@ BEGIN
     data_in <= (others => '0');
     data_in_valid <= '0';
 
-    file_open(fstatus, input_file, "./counter.txt", read_mode);
+    --file_open(fstatus, input_file, "./counter.txt", read_mode);
     -- g_nof_data_path = 2
     -- x = np.arange(1, 0x100, dtype=np.int64).reshape((-1,1))
     -- x = np.hstack((x, x + 0x100))
     -- np.savetxt('counter.txt', x, fmt='%10d')
 
-    -- file_open(fstatus, input_file, "../design/noise_and_2_lines_input.txt", read_mode);
 
     wait until sync_in = '1' and rising_edge(clk);
 
+
+    if INJECT_DIRAC then 
+        -- start by showing the impulse response
+        -- initial 0 first
+        for sample_idx in 0 to g_nof_coef*4 loop
+            data_in <= (others => '0');
+            data_in_valid <= '1';
+            wait until rising_edge(clk);
+        end loop;
+    
+        -- first isolated Dirac impulse to sense the top branch
+        for dp_idx in 0 to g_nof_data_path-1 loop
+            data_in(((dp_idx+1)*g_din_w)-1 downto dp_idx*g_din_w) <= std_logic_vector( to_signed(2**(g_din_dp-1), g_din_w) );
+        end loop;
+        data_in_valid <= '1';
+        wait until rising_edge(clk);
+    
+        for sample_idx in 0 to g_nof_coef*4+1 loop
+          data_in <= (others => '0');
+          data_in_valid <= '1';
+          wait until rising_edge(clk);
+        end loop;
+    
+        -- second isolated Dirac impulse to sense the bottom branch
+        for dp_idx in 0 to g_nof_data_path-1 loop
+          data_in(((dp_idx+1)*g_din_w)-1 downto dp_idx*g_din_w) <= std_logic_vector( to_signed(2**(g_din_dp-1), g_din_w) );
+        end loop;
+        data_in_valid <= '1';
+        wait until rising_edge(clk);
+      
+        for sample_idx in 0 to g_nof_coef*4+1 loop
+          data_in <= (others => '0');
+          data_in_valid <= '1';
+          wait until rising_edge(clk);
+        end loop;
+    
+        -- third wider Dirac impulse to sense both branches
+        for dp_idx in 0 to g_nof_data_path-1 loop
+          data_in(((dp_idx+1)*g_din_w)-1 downto dp_idx*g_din_w) <= std_logic_vector( to_signed(2**(g_din_dp-1), g_din_w) );
+        end loop;
+        data_in_valid <= '1';
+        wait until rising_edge(clk);
+        wait until rising_edge(clk);
+     
+        for sample_idx in 0 to g_nof_coef*4 loop
+          data_in <= (others => '0');
+          data_in_valid <= '1';
+          wait until rising_edge(clk);
+        end loop;
+    
+        wait until rising_edge(clk);
+    end if;  --  INJECT_DIRAC
+
+
+    -- then feed data from file
+    file_open(fstatus, input_file, "../design/noise_and_2_lines_input.txt", read_mode);
     while (not EndFile (input_file)) loop
         readline(input_file, L);
         for dp_idx in 0 to g_nof_data_path-1 loop
@@ -136,7 +193,7 @@ BEGIN
         data_in_valid <= '0';
         if RANDOM_DV_IN then RandomWait(clk, 0, 2, seed1, seed2); end if;
     end loop;
-
+    
     data_in_valid <= '0';
     file_close(input_file);
 
@@ -189,8 +246,8 @@ BEGIN
     while SIM_RUNNING loop
         if data_out_valid = '1' then
             for dp_idx in 0 to g_nof_data_path-1 loop
-                sample := to_integer(signed(data_out(((dp_idx+1)*g_din_w)-1 downto dp_idx*g_din_w)));
-                write(L, sample);
+                sample := to_integer(signed(data_out(((dp_idx+1)*g_dout_w)-1 downto dp_idx*g_dout_w)));
+                write(L, sample, right, 10);
             end loop;
             writeline(output_file, L);
         end if;
