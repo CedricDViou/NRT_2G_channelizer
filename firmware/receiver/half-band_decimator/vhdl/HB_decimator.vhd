@@ -43,7 +43,7 @@ ENTITY HB_decimator IS
     g_din_dp         : integer := 17;
     g_nof_coef       : integer := -1;
     g_coef_list      : string  := "";
-    g_coef_w         : integer := 18;
+    g_coef_w         : integer := 20;
     g_coef_dp        : integer := 17;
     g_acc_w          : integer := 48;
     g_acc_dp         : integer := 34;
@@ -208,7 +208,9 @@ ARCHITECTURE behavioral OF HB_decimator IS
     type top_delay_line_t is array(0 to c_top_delay_line_length-1) of data_in_path_t;
     signal top_delay_line : top_delay_line_t;
 
-    constant c_nof_mult     : natural := (g_nof_coef+1)/4;
+    constant c_nof_mult       : natural := (g_nof_coef+1)/4;
+    constant c_max_nof_adder  : natural := c_nof_mult/2 + (c_nof_mult mod 2);  -- add an extra adder to store delay line in case of dangling input
+    constant c_add_tree_depth : natural := natural(ceil(log2(real(c_nof_mult))));
 
     type pre_adders_path_t is array(0 to g_nof_data_path-1) of signed(g_din_w+1-1          downto 0);
     type mults_path_t      is array(0 to g_nof_data_path-1) of signed(g_din_w+1+g_coef_w-1 downto 0);
@@ -216,11 +218,29 @@ ARCHITECTURE behavioral OF HB_decimator IS
 
     type pre_adders_t is array(0 to c_nof_mult-1) of pre_adders_path_t;
     type mults_t      is array(0 to c_nof_mult-1) of mults_path_t;
-    type accs_t       is array(0 to c_nof_mult-1) of accs_path_t;
+    type accs_level_t is array(0 to c_max_nof_adder-1) of accs_path_t;
+    type accs_t       is array(0 to c_add_tree_depth-1) of accs_level_t;
 
     signal pre_adders : pre_adders_t;
     signal mults      : mults_t;
     signal accs       : accs_t;
+
+
+    function is_even(val: integer) return boolean is
+    begin
+        if val mod 2 = 0 then
+            return True;
+        else
+            return False;
+        end if;
+    end is_even;
+
+
+    function is_odd(val: integer) return boolean is
+    begin
+        return not is_even(val);
+    end is_odd;
+       
 
     function getTopArmCoefficients(CoefficientsSigned : real_array) return real_array is
         constant nof_top_coef : natural := (CoefficientsSigned'length + 1)/4;
@@ -240,7 +260,7 @@ ARCHITECTURE behavioral OF HB_decimator IS
     -- Bottom arm is a simple delay line of length of half the bottom arm filter to feed a multiplication by the central coefficient (1.0, no DSP for that)
     constant c_central_coef_idx : natural := (g_nof_coef-1)/2;
     -- The delay line length is
-    constant c_bottom_delay_line_length : natural := (g_nof_coef-3)/4 + 1 + 1;  -- +1 to compensate pre-adders located in top branch and +1 for adders after mult
+    constant c_bottom_delay_line_length : natural := (g_nof_coef-3)/4 + 1 + c_add_tree_depth + 1;  -- +1 to compensate pre-adders located in top branch and for adders in tree adder and +1 for ???
     type bottom_delay_line_t is array(0 to c_bottom_delay_line_length-1) of data_in_path_t;
     signal bottom_delay_line : bottom_delay_line_t;
 
@@ -352,6 +372,9 @@ BEGIN
 
 
     p_both_arm_filters: process(clk, rst)
+        variable v_cur_nof_adder_inputs : natural;
+        variable v_cur_nof_adder        : natural;
+        variable v_dangling_adder_input : boolean;
     begin
         if rst = '1' then
             if g_SIMULATION then  -- do NOT reset delay lines for synthesis (SRL16 optimization)
@@ -360,7 +383,7 @@ BEGIN
             end if;
             pre_adders <= (others => (others => (others => '0')));
             mults      <= (others => (others => (others => '0')));
-            accs       <= (others => (others => (others => '0')));
+            accs       <= (others => (others => (others => (others => '0'))));
             bottom_out <= (others => (others => '0'));
             filter_out <= (others => (others => '0'));
             data_out   <= (others => (others => '0'));
@@ -377,28 +400,53 @@ BEGIN
                     pre_adders(0)(data_path_idx) <= resize(data_in_demuxed(0)(data_path_idx), g_din_w+1)
                                                   + resize(top_delay_line(c_top_delay_line_length-1)(data_path_idx), g_din_w+1);
                     for pre_adder_idx in 1 to c_nof_mult-1 loop
-                        pre_adders(pre_adder_idx)(data_path_idx) <= resize(top_delay_line(pre_adder_idx)(data_path_idx), g_din_w+1)
+                        pre_adders(pre_adder_idx)(data_path_idx) <= resize(top_delay_line(pre_adder_idx-1)(data_path_idx), g_din_w+1)
                                                                   + resize(top_delay_line(c_top_delay_line_length-1-pre_adder_idx)(data_path_idx), g_din_w+1);
-                    end loop;
-                end loop;
+                    end loop;  --  pre_adder_idx
+                end loop;  --  data_path_idx
 
                 -- coef multiply
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     for mult_idx in 0 to c_nof_mult-1 loop
                         mults(mult_idx)(data_path_idx) <= c_TopArmCoefficientsSigned(mult_idx) * pre_adders(mult_idx)(data_path_idx);
-                    end loop;
-                end loop;
+                    end loop;  --  mult_idx
+                end loop;  --  data_path_idx
 
                 -- adders/accumulator
                 for data_path_idx in 0 to g_nof_data_path-1 loop
-                    -- accs(0)(data_path_idx) <= ;  NOT USED
-                    accs(1)(data_path_idx) <= resize(mults(0)(data_path_idx), g_acc_w)
-                                            + resize(mults(1)(data_path_idx), g_acc_w);
-                    for accs_idx in 2 to c_nof_mult-1 loop
-                        accs(accs_idx)(data_path_idx) <=         accs(accs_idx-1)(data_path_idx)
-                                                       + resize(mults(  accs_idx)(data_path_idx), g_acc_w);
-                    end loop;
-                end loop;
+                    v_cur_nof_adder_inputs := c_nof_mult;
+                    v_cur_nof_adder        := v_cur_nof_adder_inputs/2 + (v_cur_nof_adder_inputs mod 2);
+                    v_dangling_adder_input := is_odd(v_cur_nof_adder_inputs);
+                    for add_tree_depth in 0 to c_add_tree_depth-1 loop
+                        if add_tree_depth = 0 then
+                            for adder_idx in 0 to v_cur_nof_adder_inputs/2-1 loop
+                                accs(add_tree_depth)(adder_idx)(data_path_idx) <= resize(mults(2*adder_idx  )(data_path_idx), g_acc_w)
+                                                                                + resize(mults(2*adder_idx+1)(data_path_idx), g_acc_w);
+                            end loop;  --  adder_idx
+
+                            if v_dangling_adder_input then
+                                accs(add_tree_depth)(v_cur_nof_adder-1)(data_path_idx) <= resize(mults(v_cur_nof_adder_inputs-1)(data_path_idx), g_acc_w);
+                            end if;
+
+                            v_cur_nof_adder_inputs := v_cur_nof_adder;
+                            v_cur_nof_adder        := v_cur_nof_adder_inputs/2 + (v_cur_nof_adder_inputs mod 2);
+                            v_dangling_adder_input := is_odd(v_cur_nof_adder_inputs);
+                        else
+                            for adder_idx in 0 to v_cur_nof_adder_inputs/2-1 loop
+                                accs(add_tree_depth)(adder_idx)(data_path_idx) <= accs(add_tree_depth-1)(2*adder_idx  )(data_path_idx)
+                                                                                + accs(add_tree_depth-1)(2*adder_idx+1)(data_path_idx);
+                            end loop;  --  adder_idx
+
+                            if v_dangling_adder_input then
+                                accs(add_tree_depth)(v_cur_nof_adder-1)(data_path_idx) <= accs(add_tree_depth-1)(v_cur_nof_adder_inputs-1)(data_path_idx);
+                            end if;
+
+                            v_cur_nof_adder_inputs := v_cur_nof_adder;
+                            v_cur_nof_adder        := v_cur_nof_adder_inputs/2 + (v_cur_nof_adder_inputs mod 2);
+                            v_dangling_adder_input := is_odd(v_cur_nof_adder_inputs);
+                        end if;
+                    end loop;  -- add_tree_depth
+                end loop;  -- data_path_idx
 
               -- bottom branch filter
                 -- delay line
@@ -407,17 +455,17 @@ BEGIN
                 -- 1.0 coef multiply
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     bottom_out(data_path_idx) <= shift_left(resize(bottom_delay_line(c_bottom_delay_line_length-1)(data_path_idx), g_acc_w), g_coef_dp);
-                end loop;
+                end loop;  -- data_path_idx
 
               -- Merge both branches
                 for data_path_idx in 0 to g_nof_data_path-1 loop
-                    filter_out(data_path_idx) <= accs(c_nof_mult-1)(data_path_idx) + bottom_out(data_path_idx);
-                end loop;
+                    filter_out(data_path_idx) <= accs(c_add_tree_depth-1)(0)(data_path_idx) + bottom_out(data_path_idx);
+                end loop;  -- data_path_idx
 
               -- Convert to output format (simple truncation for now)
                 for data_path_idx in 0 to g_nof_data_path-1 loop
                     data_out(data_path_idx) <= resize( shift_right(filter_out(data_path_idx), g_acc_dp-g_dout_dp), g_dout_w);
-                end loop;
+                end loop;  -- data_path_idx
                 data_out_valid <= '1';
 
             end if;
@@ -428,7 +476,7 @@ BEGIN
                 end if;
                 pre_adders <= (others => (others => (others => '0')));
                 mults      <= (others => (others => (others => '0')));
-                accs       <= (others => (others => (others => '0')));
+                accs       <= (others => (others => (others => (others => '0'))));
                 bottom_out <= (others => (others => '0'));
                 filter_out <= (others => (others => '0'));
                 data_out   <= (others => (others => '0'));
