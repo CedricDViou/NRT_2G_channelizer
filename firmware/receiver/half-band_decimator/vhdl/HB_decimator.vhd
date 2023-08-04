@@ -91,14 +91,63 @@ ARCHITECTURE behavioral OF HB_decimator IS
     -- Convert g_coef_list string into a list of reals
     type real_array is array(natural range <>) of real;
 
+    function CharToInt(c : character) return integer is
+        begin
+            case c is
+                when '0' => return 0;
+                when '1' => return 1;
+                when '2' => return 2;
+                when '3' => return 3;
+                when '4' => return 4;
+                when '5' => return 5;
+                when '6' => return 6;
+                when '7' => return 7;
+                when '8' => return 8;
+                when '9' => return 9;
+                when others => report "Invalid character : " & c severity failure;
+                               return 0;
+            end case;
+        end function;
+
+
+    function StringToReal(s : string) return real is
+        variable result    : real := 0.0;
+        variable my_sign   : real := 1.0;
+        variable frac_part : boolean := false;
+        variable frac_exp  : real := 0.1;
+    begin
+        for i in s'range loop
+            if s(i) = '-' then
+                my_sign := -1.0;
+            elsif s(i) = '+' then
+                my_sign := 1.0;
+            elsif s(i) = '.' then
+                frac_part := true;
+            elsif s(i) >= '0' and s(i) <= '9' then
+                if frac_part then
+                    result := result + frac_exp * real(CharToInt(s(i)));
+                    frac_exp := frac_exp / 10.0;
+                else
+                    result := result * 10.0 + real(CharToInt(s(i)));
+                end if;
+            else
+                -- Handle invalid characters in the string
+                report "Invalid character in the string: " & s(i) severity failure;
+            end if;
+        end loop;
+        result := my_sign * result;
+        return result;
+    end function;
+
+
     function ToRealArray(InputString : string) return real_array is
-        constant c_max_nof_real : natural := InputString'length / 2;  -- at least one char and one space per real -> no need to allocate more space
+        constant c_max_nof_real : natural := (InputString'length + 1) / 2;  -- at least one char and one space per real -> no need to allocate more space
         variable reals : real_array(0 to c_max_nof_real-1);
         variable nof_reals     : natural := 0;
 	    variable start_idx : natural := 1;
         variable end_idx : natural := 1;
     begin
-        while end_idx <= InputString'length loop
+        while start_idx < InputString'length+1 loop
             -- search for separating space or end of string
             while end_idx <= InputString'length loop
                 if InputString(end_idx) = ' ' then
@@ -107,7 +156,9 @@ ARCHITECTURE behavioral OF HB_decimator IS
                 end_idx := end_idx + 1;
             end loop;
 
-            reals(nof_reals) := real'value(InputString(start_idx to end_idx-1));
+            -- NOT supported by Vivado
+            --reals(nof_reals) := real'value(InputString(start_idx to end_idx-1));
+            reals(nof_reals) := StringToReal(InputString(start_idx to end_idx-1));
             nof_reals := nof_reals + 1;
             start_idx := end_idx + 1;
             end_idx := start_idx + 1;
