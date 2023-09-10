@@ -29,11 +29,38 @@ TODO:
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
   - Need to improve fft area_group to make easier fits
 
+## 2023/09/09
+
+- ADC_receiver_V0
+  - Fit failed  (-0.7 to -0.3 ns slack in receiver fir_dev_tree_adders)
+  - PlanAhead
+
+
+## 2023/09/09
+
+- ADC_receiver_V0
+  - Fit failed (no area constraint)
+    - Add AREA_GROUPs to locate it in the top half of the FPGA
+
+
+## 2023/09/08
+
+- ADC_receiver_V0
+  - Synthesize NCO+DDC16 with snap for test
+  - Write python model to configure NCO tables
+
+
+## 2023/09/05
+
+- Simulation look good in August
+- Instanciate HB filter in a single channel simulink simulation model
+  - Looks OK.  Would need formal comparison with QuestaSim simulations
+- Start instanciating a 2-chan complex filter for the ADC_receiver_V0 design
+
 
 ## 2023/07/28
 
 - Working on vhdl HB filter
-
 
 ## 2023/07/04
 
