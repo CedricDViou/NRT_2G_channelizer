@@ -44,10 +44,12 @@ import imp
 import ADC_clock
 import ADC
 import sefram
+import channelizer
 
 ADC_clock = imp.reload(ADC_clock)
 ADC = imp.reload(ADC)
 sefram = imp.reload(sefram)
+channelizer = imp.reload(channelizer)
 
 
 roach2 = "192.168.40.71"
@@ -107,10 +109,10 @@ class NRT_channelizer(object):
                    'OneGbE_tx_full',
                    )
     # Add peripherals and submodules
-    self.ADCs = (ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe),
-                 ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe))
-    self.SEFRAM = sefram(fpga=self.fpga, Fe=self.Fe)
-    self.Channelizer = Channelizer()
+    self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe),
+                 ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe))
+    self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
+    self.Channelizer = channelizer.channelizer()
 
     # init modules
     self.SEFRAM.disable()

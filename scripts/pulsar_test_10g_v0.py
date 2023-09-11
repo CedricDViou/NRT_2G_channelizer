@@ -26,7 +26,8 @@
 # Author: Cedric Viou (Cedric.Viou@obs-nancay.fr)
 #
 # Description:
-# Configure and run design adc_sst_v7 (SEFRAM + Channelizer (4x28MHz from 1.8GHz))
+# Configure and run design pulsar_test_10g_v0
+# 8x Simple ramp generator, framer and 10G interface
 ################################################################################
 
 
@@ -43,17 +44,13 @@ import imp
 import casperfpga
 import ADC_clock
 import ADC
-import sefram
-import channelizer
 
 ADC_clock = imp.reload(ADC_clock)
 ADC = imp.reload(ADC)
-sefram = imp.reload(sefram)
-channelizer = imp.reload(channelizer)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/adc_c9r_sst_v5/bit_files/adc_c9r_sst_v5_2022_Oct_12_1619.fpg"
+bitstream = "../bof/pulsar_test_10g_v0/bit_files/pulsar_test_10g_v0_2022_Nov_14_0933.fpg"
 
 conf_Valon = True
 ADC_DVW_cal = True
@@ -83,7 +80,7 @@ logger.setLevel(10)
 
 
 # make class to control CASPER FPGA design for NRT channelizer
-class NRT_channelizer(object):
+class test_10g(object):
   def __init__(self, name, bitstream=None, Fe=None, feed='BF'):
     self.name = name
     self.fpga = casperfpga.CasperFpga(self.name)
@@ -104,35 +101,70 @@ class NRT_channelizer(object):
 
 
     self.monitoring_regs = (
-                   # SEFRAM
-                   'frmr_pck_cur_timestamp',
-                   'frmr_pck_cur_sample_cnt',
-                   'frmr_pck_cur_sysfreq',
-                   'frmr_acc_cnt',
-                   'OneGbE_tx_full',
-
-                   # Channelizer
-                   'select_4f64_nof_channels',
-                   'select_4f64_chan0_status',
-                   'select_4f64_chan1_status',
-                   'select_4f64_chan2_status',
-                   'select_4f64_chan3_status',
-                   'sync_cnt',
-                   'channelizer_ovr',
-                   'armed_sync_cnt',
-                   'TenGbE0_data_overflow',
-                   'TenGbE0_tx_afull',
-                   'TenGbE0_tx_overflow',
+        'sync_cnt',
+        'armed_sync_cnt',
+        'TGbE_tx_cnt0',
+        'TGbE_tx_cnt1',
+        'TGbE_tx_cnt2',
+        'TGbE_tx_cnt3',
+        'TGbE_tx_cnt4',
+        'TGbE_tx_cnt5',
+        'TGbE_tx_cnt6',
+        'TGbE_tx_cnt7',
+        'TGbE_tx_ovr0',
+        'TGbE_tx_ovr1',
+        'TGbE_tx_ovr2',
+        'TGbE_tx_ovr3',
+        'TGbE_tx_ovr4',
+        'TGbE_tx_ovr5',
+        'TGbE_tx_ovr6',
+        'TGbE_tx_ovr7',
+           
                    )
 
     # Add peripherals and submodules
     self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe, snap_basename='adcsnap'),
                  ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe, snap_basename='adcsnap'))
-    self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
-    self.Channelizer = channelizer.galactic_channelizer(fpga=self.fpga, Fe=self.Fe)
 
     # init modules
-    self.SEFRAM.disable()
+    self.fpga.write_int('TenGbE_rst', 0xff)
+
+    self.fpga.write_int('TGbE_dst_ip0'   , 0xc0a805b4, blindwrite=True)   # 192.168.5.180
+    self.fpga.write_int('TGbE_dst_ip1'   , 0xc0a805b5, blindwrite=True)   # 192.168.5.181
+    self.fpga.write_int('TGbE_dst_ip2'   , 0xc0a805b6, blindwrite=True)   # 192.168.5.182
+    self.fpga.write_int('TGbE_dst_ip3'   , 0xc0a805b7, blindwrite=True)   # 192.168.5.183
+    self.fpga.write_int('TGbE_dst_ip4'   , 0xc0a805b8, blindwrite=True)   # 192.168.5.184
+    self.fpga.write_int('TGbE_dst_ip6'   , 0xc0a805ba, blindwrite=True)   # 192.168.5.186
+    self.fpga.write_int('TGbE_dst_ip7'   , 0xc0a805bb, blindwrite=True)   # 192.168.5.187
+    self.fpga.write_int('TGbE_dst_ip5'   , 0xc0a805b9, blindwrite=True)   # 192.168.5.185
+
+    self.fpga.write_int('TGbE_dst_port0' , 10000)
+    self.fpga.write_int('TGbE_dst_port1' , 10001)
+    self.fpga.write_int('TGbE_dst_port2' , 10002)
+    self.fpga.write_int('TGbE_dst_port3' , 10003)
+    self.fpga.write_int('TGbE_dst_port4' , 10004)
+    self.fpga.write_int('TGbE_dst_port5' , 10005)
+    self.fpga.write_int('TGbE_dst_port6' , 10006)
+    self.fpga.write_int('TGbE_dst_port7' , 10007)
+
+
+    pkt_len=1024
+    T_1s = self.Fe/16
+    nof_pkt_per_s = 5
+    pkt_period = T_1s // nof_pkt_per_s
+    self.fpga.write_int('sim_enable',      0)
+    self.fpga.write_int('sim_payload_len', pkt_len)
+    self.fpga.write_int('sim_period'     , pkt_period)
+
+    #                                               # header 1 : hdr_head_id: packet counter generated in HW
+    self.fpga.write_int('hdr_ADC_Freq',   0xcc02)  # header 2
+    self.fpga.write_int('hdr_heapoffset', 0xcc03)  # header 3
+    self.fpga.write_int('hdr_len_w',      pkt_len)  # header 4 : MUST be packet payload len
+    self.fpga.write_int('hdr5',           0xcc05)  # header 5
+    self.fpga.write_int('hdr6',           0xcc06)  # header 6
+    self.fpga.write_int('hdr7_free',      0xcc07)  # header 7
+
+
 
 
   def cnt_rst(self):
@@ -140,9 +172,6 @@ class NRT_channelizer(object):
     self.fpga.write_int('cnt_rst', 0)
 
   def arm_PPS(self):
-    """
-    todo
-    """
     self.fpga.write_int('reg_arm', 0)
     now = time.time()
     before_half_second = 0.5 - (now-int(now))
@@ -175,7 +204,7 @@ class NRT_channelizer(object):
       ADC.adcmode=adcmode[self._feed]
 
 
-mydesign = NRT_channelizer(
+mydesign = test_10g(
   roach2,
   bitstream=bitstream,
   Fe=Fe
@@ -195,7 +224,7 @@ if ADC_DVW_cal:
 
 
 if False:
-  [ ADC.get_snapshot(count=100) for ADC in mydesign.ADCs ]
+  [ ADC.get_snapshot(count=1000) for ADC in mydesign.ADCs ]
   [ ADC.dump_snapshot() for ADC in mydesign.ADCs ]
 
 
@@ -244,70 +273,16 @@ plt.tight_layout()
 plt.show(block=False)
 
 
-print('SEFRAM Configuration')
-
-mydesign.SEFRAM.disable()
-mydesign.cnt_rst()
-time.sleep(0.2)
-
-
-
-Nspec_per_sec = mydesign.SEFRAM.Fe / mydesign.SEFRAM.Nfft
-acc_len = int(Nspec_per_sec // 10)
-mydesign.SEFRAM.acc_len = acc_len
-
-print('vacc_n_frmr_acc_cnt = ', mydesign.SEFRAM.acc_cnt)
-
-fft_shift_reg = 0b1111111111
-mydesign.SEFRAM.fft_shift = fft_shift_reg
-print('SEFRAM FFT gain = ', mydesign.SEFRAM.fft_gain)
-
-mydesign.SEFRAM.dst_addr = ("192.168.41.1", 0xcece)
-mydesign.SEFRAM.IFG = 100000
-mydesign.SEFRAM.print_datarate()
-
-# fpga.write_int('vacc_n_frmr_pcktizer_ADC_freq', int(Fe), blindwrite=True)
-# set during SEFRAM instanciation
-
-# mydesign.SEFRAM.ID = 0xcece
-# set in SEFRAM constructor
-
-mydesign.SEFRAM.arm()    # à renomer
-
-
-
-print('Channelizer Configuration')
-
-mydesign.Channelizer.network_config()
-mydesign.Channelizer.clear()
-
-# configure FFT
-#fft_shift = 0b000000
-#fft_shift = 0b111111
-fft_shift = 0b010111
-mydesign.Channelizer.fft_shift = fft_shift
-
-
-# configure rescaler
-# Selects which 8 bits from 18 are outputted.
-# 0 is lowest 8-bits: bits 0-7 (inclusive)
-# 1: bits 4-11
-# 2: bits 8-15
-# 3 is highest 8-bits: bits 10-17
-scale = 2
-mydesign.Channelizer.scale = (scale, scale)
-
-
-# configure channel_selector
-#mydesign.Channelizer.channels = (0, 1, 2, 3)
-mydesign.Channelizer.channels = 51   # HI line from galaxy should be there
-
-
-
 
 print('Wait for half second and arm PPS_trigger')
+mydesign.cnt_rst()
 mydesign.arm_PPS()
+mydesign.fpga.write_int('TenGbE_rst', 0x00)
+mydesign.fpga.write_int('sim_enable', 0xff)
 mydesign.monitor()
+
+
+
 
 print('Started!!!')
 time.sleep(1)
@@ -316,29 +291,13 @@ time.sleep(1)
 mydesign.monitor()
 
 
+if False:
+    mydesign.fpga.write_int('TenGbE_rst', 0xff)
+    mydesign.fpga.write_int('sim_enable', 0x00)
+    mydesign.cnt_rst()
+
+
 mydesign.monitor()
-
-# after dummy frame, allow outputing data and starting framer 
-mydesign.SEFRAM.enable()
-
-mydesign.SEFRAM.time = "now"  # set time to current UNIX timestamp
-print(mydesign.SEFRAM.time)
-
-
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-
-
-
-
-
-
-
 
 plt.show()
 

@@ -53,13 +53,15 @@ channelizer = imp.reload(channelizer)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/adc_c9r_sst_v5/bit_files/adc_c9r_sst_v5_2022_Oct_12_1619.fpg"
+bitstream = "../bof/pulsar_mode_v0/bit_files/pulsar_mode_v0_2023_Jan_16_1348.fpg"
+bitstream = "../bof/pulsar_mode_v0/bit_files/pulsar_mode_v0_2023_Feb_02_1350.fpg"
 
 conf_Valon = True
 ADC_DVW_cal = True
 ADC_OGP_cal = True
 
-Fe = 3580000000.0 # Hz
+#FEED, Fe = 'HF', 3200000000.0 # 1.6-3.2  GHz
+FEED, Fe = 'BF', 3700000000.0 #   0-1.85 GHz
 F_valon = Fe / 2
 Fsys = F_valon / 8
 Fin = 130000000# Hz
@@ -83,7 +85,7 @@ logger.setLevel(10)
 
 
 # make class to control CASPER FPGA design for NRT channelizer
-class NRT_channelizer(object):
+class NRT_pulsar(object):
   def __init__(self, name, bitstream=None, Fe=None, feed='BF'):
     self.name = name
     self.fpga = casperfpga.CasperFpga(self.name)
@@ -104,6 +106,16 @@ class NRT_channelizer(object):
 
 
     self.monitoring_regs = (
+                   'sys_board_id',
+                   'sys_clkcounter',
+                   'sys_rev',
+                   'sys_rev_rcs',
+                   'sys_scratchpad',
+
+                   'FPGA_ver',
+                   'sync_cnt',
+                   'armed_sync_cnt',                   
+
                    # SEFRAM
                    'frmr_pck_cur_timestamp',
                    'frmr_pck_cur_sample_cnt',
@@ -112,24 +124,48 @@ class NRT_channelizer(object):
                    'OneGbE_tx_full',
 
                    # Channelizer
-                   'select_4f64_nof_channels',
-                   'select_4f64_chan0_status',
-                   'select_4f64_chan1_status',
-                   'select_4f64_chan2_status',
-                   'select_4f64_chan3_status',
+                   'channelizer_reorder_frm_cnt0',
                    'sync_cnt',
-                   'channelizer_ovr',
                    'armed_sync_cnt',
-                   'TenGbE0_data_overflow',
-                   'TenGbE0_tx_afull',
-                   'TenGbE0_tx_overflow',
+                   'frm_data_ovr0',
+                   'frm_data_ovr1',
+                   'frm_data_ovr2',
+                   'frm_data_ovr3',
+                   'frm_data_ovr4',
+                   'frm_data_ovr5',
+                   'frm_data_ovr6',
+                   'frm_data_ovr7',
+                   'TGbE_tx_afull0',
+                   'TGbE_tx_afull1',
+                   'TGbE_tx_afull2',
+                   'TGbE_tx_afull3',
+                   'TGbE_tx_afull4',
+                   'TGbE_tx_afull5',
+                   'TGbE_tx_afull6',
+                   'TGbE_tx_afull7',
+                   'TGbE_tx_cnt0',
+                   'TGbE_tx_cnt1',
+                   'TGbE_tx_cnt2',
+                   'TGbE_tx_cnt3',
+                   'TGbE_tx_cnt4',
+                   'TGbE_tx_cnt5',
+                   'TGbE_tx_cnt6',
+                   'TGbE_tx_cnt7',
+                   'TGbE_tx_ovr0',
+                   'TGbE_tx_ovr1',
+                   'TGbE_tx_ovr2',
+                   'TGbE_tx_ovr3',
+                   'TGbE_tx_ovr4',
+                   'TGbE_tx_ovr5',
+                   'TGbE_tx_ovr6',
+                   'TGbE_tx_ovr7',
                    )
 
     # Add peripherals and submodules
     self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe, snap_basename='adcsnap'),
                  ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe, snap_basename='adcsnap'))
     self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
-    self.Channelizer = channelizer.galactic_channelizer(fpga=self.fpga, Fe=self.Fe)
+    self.Channelizer = channelizer.pulsar_channelizer(fpga=self.fpga, Fe=self.Fe, rescale_basename='channelizer_rescale_')
 
     # init modules
     self.SEFRAM.disable()
@@ -158,6 +194,15 @@ class NRT_channelizer(object):
     for reg in self.monitoring_regs:
         print(reg, self.fpga.read_uint(reg))
 
+  def PPS_presents(self, nof_PPS=1):
+    for pps in range(nof_PPS):
+      prev = self.fpga.read_uint('sync_cnt')
+      time.sleep(1)
+      curr = self.fpga.read_uint('sync_cnt')
+      assert curr-prev == 1, "PPS not detected"
+      print(".")
+    return True
+
   @property
   def feed(self):
     return self._feed
@@ -175,17 +220,22 @@ class NRT_channelizer(object):
       ADC.adcmode=adcmode[self._feed]
 
 
-mydesign = NRT_channelizer(
+mydesign = NRT_pulsar(
   roach2,
   bitstream=bitstream,
   Fe=Fe
   )
 
+mydesign.feed = FEED
+
 dev = mydesign.listdev()
 for d in dev:
     print(d)
-print()
+print("")
 
+print("PPS?")
+if mydesign.PPS_presents(nof_PPS=2):
+    print('PPS found!')
 
 if ADC_DVW_cal:
   print('Calibrating ADCs')
@@ -243,66 +293,74 @@ ADC_axs[2].set_xlim((0, f[-1]))
 plt.tight_layout()
 plt.show(block=False)
 
+if True:
+  print('SEFRAM Configuration')
+  
+  mydesign.SEFRAM.disable()
+  mydesign.cnt_rst()
+  time.sleep(0.2)
+  
+  
+  
+  Nspec_per_sec = mydesign.SEFRAM.Fe / mydesign.SEFRAM.Nfft
+  acc_len = int(Nspec_per_sec // 10)
+  mydesign.SEFRAM.acc_len = acc_len
+  
+  print('vacc_n_frmr_acc_cnt = ', mydesign.SEFRAM.acc_cnt)
+  
+  fft_shift_reg = 0b1111111111
+  mydesign.SEFRAM.fft_shift = fft_shift_reg
+  print('SEFRAM FFT gain = ', mydesign.SEFRAM.fft_gain)
+  
+  mydesign.SEFRAM.dst_addr = ("192.168.41.1", 0xcece)
+  mydesign.SEFRAM.IFG = 100000
+  mydesign.SEFRAM.print_datarate()
+  
+  # fpga.write_int('vacc_n_frmr_pcktizer_ADC_freq', int(Fe), blindwrite=True)
+  # set during SEFRAM instanciation
+  
+  # mydesign.SEFRAM.ID = 0xcece
+  # set in SEFRAM constructor
 
-print('SEFRAM Configuration')
-
-mydesign.SEFRAM.disable()
-mydesign.cnt_rst()
-time.sleep(0.2)
-
-
-
-Nspec_per_sec = mydesign.SEFRAM.Fe / mydesign.SEFRAM.Nfft
-acc_len = int(Nspec_per_sec // 10)
-mydesign.SEFRAM.acc_len = acc_len
-
-print('vacc_n_frmr_acc_cnt = ', mydesign.SEFRAM.acc_cnt)
-
-fft_shift_reg = 0b1111111111
-mydesign.SEFRAM.fft_shift = fft_shift_reg
-print('SEFRAM FFT gain = ', mydesign.SEFRAM.fft_gain)
-
-mydesign.SEFRAM.dst_addr = ("192.168.41.1", 0xcece)
-mydesign.SEFRAM.IFG = 100000
-mydesign.SEFRAM.print_datarate()
-
-# fpga.write_int('vacc_n_frmr_pcktizer_ADC_freq', int(Fe), blindwrite=True)
-# set during SEFRAM instanciation
-
-# mydesign.SEFRAM.ID = 0xcece
-# set in SEFRAM constructor
-
-mydesign.SEFRAM.arm()    # à renomer
-
-
-
-print('Channelizer Configuration')
-
-mydesign.Channelizer.network_config()
-mydesign.Channelizer.clear()
-
-# configure FFT
-#fft_shift = 0b000000
-#fft_shift = 0b111111
-fft_shift = 0b010111
-mydesign.Channelizer.fft_shift = fft_shift
+  mydesign.SEFRAM.arm()    # à renomer
 
 
-# configure rescaler
-# Selects which 8 bits from 18 are outputted.
-# 0 is lowest 8-bits: bits 0-7 (inclusive)
-# 1: bits 4-11
-# 2: bits 8-15
-# 3 is highest 8-bits: bits 10-17
-scale = 2
-mydesign.Channelizer.scale = (scale, scale)
+if True:
+  print('Channelizer Configuration')
+  
+  mydesign.Channelizer.disable()
+  mydesign.Channelizer.network_config()
+  
+  
+  # configure rescaler
+  # Selects which 8 bits from 18 are outputted.
+  # 0 is lowest 8-bits: bits 0-7 (inclusive)
+  # 1: bits 4-11
+  # 2: bits 8-15
+  # 3 is highest 8-bits: bits 10-17
+  scale = 0
+  mydesign.Channelizer.scale = scale
+  
+  mydesign.Channelizer.enable()
+  
 
-
-# configure channel_selector
-#mydesign.Channelizer.channels = (0, 1, 2, 3)
-mydesign.Channelizer.channels = 51   # HI line from galaxy should be there
-
-
+if False:
+  snap_name = 'TGbEsnap'
+  data = mydesign.fpga.snapshots[snap_name].read_raw(man_valid=True, man_trig=False)
+  dt_snap=np.dtype([
+      ('empty',np.uint32),
+      ('eof', np.uint16),
+      ('valid', np.uint16),
+      ('data', np.int8, 8),
+      ])
+  tmp  = np.frombuffer(data[0]['data'], dtype=dt_snap)
+  fig, axs = plt.subplots(nrows = 3, 
+                          ncols = 1,
+                          sharex='col', sharey='col',
+                          )
+  axs[0].plot(tmp['valid'], '.')
+  axs[1].plot(tmp['eof'], 'x')
+  axs[2].plot(tmp['data'],'+')
 
 
 print('Wait for half second and arm PPS_trigger')

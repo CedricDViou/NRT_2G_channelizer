@@ -53,11 +53,10 @@ channelizer = imp.reload(channelizer)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/adc_c9r_sst_v5/bit_files/adc_c9r_sst_v5_2022_Oct_12_1619.fpg"
+bitstream = "../bof/adc_c9r_sst_v4/bit_files/adc_c9r_sst_v4_2022_Sep_29_1522.fpg"
 
 conf_Valon = True
-ADC_DVW_cal = True
-ADC_OGP_cal = True
+ADC_cal = True
 
 Fe = 3580000000.0 # Hz
 F_valon = Fe / 2
@@ -129,7 +128,7 @@ class NRT_channelizer(object):
     self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe, snap_basename='adcsnap'),
                  ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe, snap_basename='adcsnap'))
     self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
-    self.Channelizer = channelizer.galactic_channelizer(fpga=self.fpga, Fe=self.Fe)
+    self.Channelizer = channelizer.channelizer(fpga=self.fpga, Fe=self.Fe)
 
     # init modules
     self.SEFRAM.disable()
@@ -140,9 +139,6 @@ class NRT_channelizer(object):
     self.fpga.write_int('cnt_rst', 0)
 
   def arm_PPS(self):
-    """
-    todo
-    """
     self.fpga.write_int('reg_arm', 0)
     now = time.time()
     before_half_second = 0.5 - (now-int(now))
@@ -187,20 +183,16 @@ for d in dev:
 print()
 
 
-if ADC_DVW_cal:
+if ADC_cal:
   print('Calibrating ADCs')
   [ ADC.run_DVW_calibration() for ADC in mydesign.ADCs ]
   [ ADC.print_DVW_calibration() for ADC in mydesign.ADCs ]
   print('Done')
 
 
-if False:
-  [ ADC.get_snapshot(count=100) for ADC in mydesign.ADCs ]
-  [ ADC.dump_snapshot() for ADC in mydesign.ADCs ]
-
-
 
 Nfft = 4096
+nof_lanes = 8
 
 [ ADC.get_snapshot() for ADC in mydesign.ADCs ]
 fig, axs = plt.subplots(nrows = len(mydesign.ADCs), 
@@ -209,25 +201,25 @@ fig, axs = plt.subplots(nrows = len(mydesign.ADCs),
                         )
 
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
-  ADC_wave = ADC.wave.copy()
+    ADC_wave = ADC.wave.copy()
 
-  Nech_to_plot = 16384
-  ADC_axs[0].plot(np.arange(Nech_to_plot) / Fe * 1e6,
-                  ADC_wave[:Nech_to_plot],
-                  label=ADC.name)
+    Nech_to_plot = 16384
+    ADC_axs[0].plot(np.arange(Nech_to_plot) / Fe * 1e6,
+                    ADC_wave[:Nech_to_plot],
+                    label=ADC.name)
 
-  cnt, bins, _ = ADC_axs[1].hist(ADC.wave, bins=np.arange(-128, 129) - 0.5)
+    cnt, bins, _ = ADC_axs[1].hist(ADC.wave, bins=np.arange(-128, 129) - 0.5)
 
-  nof_samples = len(ADC_wave)
-  f = np.arange(Nfft/2+1, dtype='float') / Nfft * Fe /1e6 
-  w = np.blackman(Nfft)
-  ADC_wave.shape = ((-1, Nfft))
-  DATA = np.fft.rfft(w * ADC_wave, axis=-1)
-  DATA = DATA.real**2 + DATA.imag**2
-  DATA = DATA.mean(axis=0)
-  ADC_axs[2].plot(f,
-                  10*np.log10(DATA),
-                  label=ADC.name)
+    nof_samples = len(ADC_wave)
+    f = np.arange(Nfft/2+1, dtype='float') / Nfft * Fe /1e6 
+    w = np.blackman(Nfft)
+    ADC_wave.shape = ((-1, Nfft))
+    DATA = np.fft.rfft(w * ADC_wave, axis=-1)
+    DATA = DATA.real**2 + DATA.imag**2
+    DATA = DATA.mean(axis=0)
+    ADC_axs[2].plot(f,
+                    10*np.log10(DATA),
+                    label=ADC.name)
 
 ADC_axs[0].set_xlabel(u"Time (us)")
 ADC_axs[0].set_xlim((0, (Nech_to_plot-1) / Fe * 1e6))
@@ -258,7 +250,8 @@ mydesign.SEFRAM.acc_len = acc_len
 
 print('vacc_n_frmr_acc_cnt = ', mydesign.SEFRAM.acc_cnt)
 
-fft_shift_reg = 0b1111111111
+fft_shift_reg = 0xfff
+fft_shift_reg = 0b010111
 mydesign.SEFRAM.fft_shift = fft_shift_reg
 print('SEFRAM FFT gain = ', mydesign.SEFRAM.fft_gain)
 
@@ -272,7 +265,7 @@ mydesign.SEFRAM.print_datarate()
 # mydesign.SEFRAM.ID = 0xcece
 # set in SEFRAM constructor
 
-mydesign.SEFRAM.arm()    # à renomer
+mydesign.SEFRAM.arm()
 
 
 
