@@ -32,6 +32,7 @@
 ################################################################################
 
 import time
+import numpy as np
 
 class galactic_channelizer(object):
   def __init__(self, fpga=None, Fe=None, channelizer_basename='channelizer_', rescale_basename='rescale_', select_basename='select_4f64_', network_basename='TenGbE0_'):
@@ -229,3 +230,103 @@ class pulsar_channelizer(object):
   def scale(self, value):
     self._scale = value
     self.fpga.write_int(self.rescale_basename+'shift', self._scale)
+
+
+
+class receiver(object):
+  def __init__(self, fpga=None, Fe=None, receiver_basename='channelizer_', NCO_basename='rescale_', DDC_basename='select_4f64_', network_basename='TenGbE0_'):
+    assert fpga is not None
+    assert Fe is not None
+    self.fpga = fpga
+    self.Fe = int(Fe)
+    self.receiver_basename = receiver_basename
+    self.NCO_basename = NCO_basename
+    self.DDC_basename = DDC_basename
+    self.network_basename = network_basename
+    self.scale_basename = self.receiver_basename+'bitselect'
+    self.kc = 0
+    self.K = 1024     # NCO can be configured from 0 to K-1
+    self.NCO_par = 16 # NCO processes 16 samples in //
+    self.NCO_tables = None
+
+
+  def __str__(self):
+    return "Receiver -> Fc=%f" % (self.Fc)
+
+
+  def __repr__(self):
+    return "Receiver(fpga=%s, Fe=%d, receiver_basename=\'%s\', NCO_basename=\'%s\', DDC_basename=\'%s\', network_basename=\'%s\')" % (
+            str(self.fpga),
+            self.Fe,
+            self.receiver_basename,
+            self.NCO_basename,
+            self.DDC_basename,
+            self.network_basename,
+            )
+
+
+  def disable(self):
+    raise('NOT IMPLEMENTED')
+
+  def enable(self):
+    raise('NOT IMPLEMENTED')
+
+  def NCO_calc_tables(self):
+    NCO_w = 16
+    NCO_dp = 15
+    Max_NCO_val = 2**(NCO_dp)-1
+    ReIm = 2
+    L0_mem = np.exp(2j*np.pi*(-self.kc) * np.arange(self.K * self.NCO_par) / self.K)
+    L0_mem = L0_mem.reshape((self.K, self.NCO_par))
+    L0_mem_ReIm = L0_mem.view(np.float64).reshape((self.K, self.NCO_par, ReIm))
+    L0_mem_ImRe = L0_mem_ReIm[:,:,-1::-1]
+    L0_mem_ImRe_int = np.round(L0_mem_ImRe * Max_NCO_val)
+    L0_mem_ImRe_int16 = L0_mem_ImRe_int.astype(np.int16)
+    L0_mem_uint32 = L0_mem_ImRe_int16.view(np.uint32)[...,0]
+    self.NCO_tables = L0_mem_uint32.T
+
+  def NCO_write_tables(self):
+    if self.NCO_tables is not None:
+      for table_idx, table_content in enumerate(self.NCO_tables):
+        self.fpga.write(self.NCO_basename + '%d'%table_idx, table_content)
+    raise('NOT TESTED')
+
+  def NCO_read_tables(self):
+    tables = []
+    for table_idx in range(self.NCO_par):
+        table_content = self.fpga.read(self.NCO_basename + '%d'%table_idx, self.K * 8)
+        tables.append(table_content)
+    raise('NOT TESTED')
+    return tables
+
+
+  @property
+  def Fc(self):
+    return self.kc / self.K * self.Fe
+  
+  @Fc.setter 
+  def Fc(self, value):
+    self.kc = round(value / self.Fe * self.K)
+    # self.NCO_calc_tables()
+    # self.NCO_write_tables()
+
+  
+  @property
+  def scale(self):
+    self._scale = self.fpga.read_uint(self.scale_basename)
+    return self._scale
+  
+  @scale.setter 
+  def scale(self, value):
+    self._scale = value
+    raise('NOT IMPLEMENTED')
+    self.fpga.write_int(self.scale_basename, self._scale)
+
+
+  def force_eof(self):
+    raise('NOT IMPLEMENTED')
+
+  def network_config(self, dst_IP, dst_port):
+    raise('NOT IMPLEMENTED')
+
+
