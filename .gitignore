@@ -106,3 +106,6 @@ venv.bak/
 **/vhdl/work
 **/vhdl/vsim.wlf
 *.bak
+
+bof/*
+*bin
