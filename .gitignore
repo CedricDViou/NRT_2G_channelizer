@@ -112,10 +112,11 @@ bof/*
 *.bin
 *.png
 *.txt
-*.pdf
-*.odp
 
 **/quartus/db
 **/quartus/incremental_db
 **/quartus/output_files
 *.qws
+*.cache
+*.pdf
+*.odp
