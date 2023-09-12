@@ -29,11 +29,28 @@ TODO:
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
   - Need to improve fft area_group to make easier fits
 
-## 2023/09/09
+## 2023/09/12
+
+- ADC_receiver_V0
+  - Fit failed but that was expected.
+  - Separate the 2 dec_fir in different AREA_GROUP
+
+
+## 2023/09/11
+
+- ADC_receiver_V0
+  - Fit failed  (-0.66 to -0.3 ns slack in receiver fir_dev_tree_adders)
+  - PlanAhead
+  - Reduce AREA_GROUP surface for L0 + dec_fir16
+
+
+## 2023/09/10
 
 - ADC_receiver_V0
   - Fit failed  (-0.7 to -0.3 ns slack in receiver fir_dev_tree_adders)
   - PlanAhead
+  - Wrong name for receiver module -> constraint not taken into account
+  - Fix and rerun
 
 
 ## 2023/09/09
