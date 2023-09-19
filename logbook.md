@@ -29,6 +29,34 @@ TODO:
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
   - Need to improve fft area_group to make easier fits
 
+## 2023/09/18
+
+- ADC_receiver_V0
+  - XPS not started at right level..  Start again...
+
+
+## 2023/09/18
+
+- ADC_receiver_V0
+  - Testing L0 tables programming
+  - Errors when reading back the data.  Getting some 0's instead...
+  - Cleanup working directory
+  - Start new fit
+
+
+## 2023/09/13-14
+
+- ADC_receiver_V0
+  - Fit failures because of wrong ucf content
+  - Remove SEFRAM to speedup timing closure corrections
+  - Add pipeline registers between Li and dec_fir[01], and dec_fir[01] and dec_out
+  - Reduce dec_fir coef_w (25 -> 16)
+  - Change TreeAdder DSP48 implementation into behavioral
+  - Fit sucessful 2023_Sep_14_1449
+  - Add back SEFRAM
+  - Fit sucessful 2023_Sep_14_1547 ???
+
+
 ## 2023/09/12
 
 - ADC_receiver_V0
