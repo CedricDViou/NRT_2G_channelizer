@@ -1,0 +1,61 @@
+# CLOCKREGION range X0Y0:X1Y8
+# |--------|--------|
+# |  X0Y8  |  X1Y8  |
+# |--------|--------|
+# |  X0Y7  |  X1Y7  |
+# |--------|--------|
+# |  X0Y6  |  X1Y6  |
+# |--------|--------|
+# |  X0Y5  |  X1Y5  |
+# |--------|--------|
+# |  X0Y4  |  X1Y4  |
+# |--------|--------|
+# |  X0Y3  |  X1Y3  |
+# |--------|--------|
+# |  X0Y2  |  X1Y2  |
+# |--------|--------|
+# |  X0Y1  |  X1Y1  |
+# |--------|--------|
+# |  X0Y0  |  X1Y0  |
+# |--------|--------|
+
+# SLICE range X0Y0:X209Y359
+
+# |---------|-----------|-----------|
+# |  X0Y359 |  X...Y359 |  X209Y359 |
+# |---------|-----------|-----------|
+# |   ...   |    ...    |   ...     |
+# |   ...   |    ...    |   ...     |
+# |---------|-----------|-----------|
+# |  X0Y0   |  X...Y0   |  X209Y0   |
+# |---------|-----------|-----------|
+
+# ADCs
+INST "adc_sst_v7_adc0_asiaa_adc5g/*" AREA_GROUP = "ZDOK_0_ALL";
+INST "adc_sst_v7_adc1_asiaa_adc5g/*" AREA_GROUP = "ZDOK_1_ALL";
+
+
+# SEFRAM
+INST "*/sefram_*/fft0/*" AREA_GROUP = "seframFFT0_grp";
+AREA_GROUP "seframFFT0_grp" RANGE=SLICE_X0Y0:SLICE_X209Y70;
+AREA_GROUP "seframFFT0_grp" RANGE=DSP48_X0Y0:DSP48_X13Y27;
+AREA_GROUP "seframFFT0_grp" RANGE=RAMB18_X0Y0:RAMB18_X14Y27;
+AREA_GROUP "seframFFT0_grp" RANGE=RAMB36_X0Y0:RAMB36_X14Y13;
+
+INST "*/sefram_*/apodisation*" AREA_GROUP = "seframWIN_grp";
+AREA_GROUP "seframWIN_grp" RANGE=SLICE_X0Y71:SLICE_X209Y90;
+AREA_GROUP "seframWIN_grp" RANGE=DSP48_X0Y30:DSP48_X13Y35;
+AREA_GROUP "seframWIN_grp" RANGE=RAMB18_X0Y30:RAMB18_X14Y35;
+AREA_GROUP "seframWIN_grp" RANGE=RAMB36_X0Y15:RAMB36_X14Y17;
+
+INST "*/sefram_*/fft1/*" AREA_GROUP = "seframFFT1_grp";
+AREA_GROUP "seframFFT1_grp" RANGE=SLICE_X0Y91:SLICE_X209Y158;
+AREA_GROUP "seframFFT1_grp" RANGE=DSP48_X0Y38:DSP48_X13Y61;
+AREA_GROUP "seframFFT1_grp" RANGE=RAMB18_X0Y38:RAMB18_X14Y61;
+AREA_GROUP "seframFFT1_grp" RANGE=RAMB36_X0Y19:RAMB36_X14Y30;
+
+INST "*/frmr_*/*"        AREA_GROUP = "sefram_frmr_grp";
+AREA_GROUP "sefram_frmr_grp" RANGE=SLICE_X0Y159:SLICE_X133Y209;
+AREA_GROUP "sefram_frmr_grp" RANGE=DSP48_X0Y64:DSP48_X7Y83;
+AREA_GROUP "sefram_frmr_grp" RANGE=RAMB18_X0Y64:RAMB18_X8Y83;
+AREA_GROUP "sefram_frmr_grp" RANGE=RAMB36_X0Y32:RAMB36_X8Y41;
