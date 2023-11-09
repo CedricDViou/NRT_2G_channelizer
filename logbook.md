@@ -29,10 +29,118 @@ TODO:
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
   - Need to improve fft area_group to make easier fits
 
-## 2023/09/18
 
+
+## 2023/11/09
+- ADC_receiver_V0
+  - with of the filtrer is too narrow by a factor of 2
+    - Wrong use of scipy.signal.firwin (mixup between f_s and f_ny)
+    - Fixed it
+    - Realise that we can loosen the filter length (256 -> 128) to get the right rejection
+    - Set new coef to slx file
+    - Start fit
+
+## 2023/11/06
+- ADC_receiver_V0
+  - Output of dec_fir look good now regarding NCO
+  - However, the with of the filtrer is too narrow by a factor of 2 -> need to understand and fix that.
+  - Change back dataformat to original configuration now that it is understood.
+  - Use Q16.15 coefficients for receiver0
+  - Start fit
+  - Data still look good, but wrong dec_out snap data width.  Fix, increase depth and fit again  
+
+
+
+## 2023/11/02
+- ADC_receiver_V0
+  - receiver0_L0_?_mem memories were written with wrong endian.
+  - Fix python
+  - Put back dec_fir1 filter and dec_out snap
+  - Start fit
+
+
+## 2023/10/31
+- ADC_receiver_V0
+  - Add snap to all mixer outputs to try to understand something...
+
+
+## 2023/10/08
+- ADC_receiver_V0
+  - Forgot to modify data format for dec_fir1
+  - Used Fix_32_23 instead of Fix_32_22
+  - Start fit
+
+
+## 2023/10/06
+- dec_fir_sim
+  - Simulation looks good...
+- ADC_receiver_V0
+  - dec_fir snapshot read back as 32-bit data.  But it's 64bits...
+  - Data saturation located on dec_fir output could be due to cast from Fix_40_30 to Fix_16_15 in dec_fir, after >>5.
+    - Cast to Fix_32_23 and record data to check.
+    - Start fit
+
+
+## 2023/09/27
+- ADC_receiver_V0
+  - Inject a sine at 5 MHz, if supported
+    - 50MHz, 10 mV is set
+  
+
+## 2023/09/26
+- ADC_receiver_V0
+  - snapshots data for kc=0
+    - L0_0_din0_in: \mu=6e-3, \sigma=0.14
+    - L0_0_mult_out: \mu=-5e-5, \sigma=6e-4
+    - L0_0_cast_out: \mu=-5e-5, \sigma=6e-4
+    - dec_fir0_sum_out: \mu=5e-4, \sigma=7e-4, lots of 0's, strongly positive (almost like a power...)
+    - dec_fir0_sr5_out: \mu=1e-5, \sigma=4e-5, lots of 0's, strongly positive (almost like a power...)
+  - snapshots data for kc=0
+    - L0_0_din0_in: \mu=6e-3, \sigma=0.14
+    - L0_0_mult_out: \mu=1e-3, \sigma=9e-2
+    - L0_0_cast_out: \mu=1e-3, \sigma=9e-2
+    - dec_fir0_sum_out: \mu=1e-3, \sigma=3e-1, 0's half the time
+    - dec_fir0_sr5_out: \mu=2e-4, \sigma=1e-2, 0's half the time
+
+
+## 2023/09/25
+- ADC_receiver_V0
+  - L0: With right endian (dt.newbyteorder('>')), data looks fine after mixer
+  - The 256 coef of the dec_fir add up to 32.  We may be saturating the output of the dec_fir
+  - Add 5 shift right and snaps to dec_fir0 to check that 
+  - New fit
+
+
+## 2023/09/22
+- ADC_receiver_V0
+  - NCO to dec_fir : wrong Complex to ReIm configuration (getting Fix_8_7 instead of Fix_16_15)
+  - Fix
+  - New fit
+
+## 2023/09/21
+- ADC_receiver_V0
+  - Recompile without receiver, only SEFRAM.  No register read error anymore...
+  - Put back receiver and compile to check again.
+  - No register read error anymore...  Quite strange and scary, but let's move on!
+
+
+## 2023/09/20
+- ADC_receiver_V0
+  - simulating NCO L0 (NCO_sim.xls)
+  - Fix mem output to UFix_32_0
+
+
+## 2023/09/19
+- ADC_receiver_V0
+  - But no errors during reads on older designs (pulsar mode in occurence)
+  - NCO output looks bad (too strong -> sim is needed)
+
+
+## 2023/09/18
 - ADC_receiver_V0
   - XPS not started at right level..  Start again...
+  - Same errors when reading back the data.  Getting some 0's instead...
+    - Wireshark shows 0's : !read ok \0\0\0\0 even for a single register
 
 
 ## 2023/09/18
