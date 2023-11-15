@@ -29,26 +29,35 @@ TODO:
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
   - Need to improve fft area_group to make easier fits
 
+## 2023/11/13-15
+- ADC_receiver_V0
+  - NRT_2G_spectrometer/firmware/receiver/DDC_par16/dec16_fir_and_H3_H2_H1_H0.ipynb
+    - Work on the final HB filters
 
 
 ## 2023/11/09
 - ADC_receiver_V0
   - with of the filtrer is too narrow by a factor of 2
+    - ![Alt text](doc/20231110_narrow_filter.png)
     - Wrong use of scipy.signal.firwin (mixup between f_s and f_ny)
     - Fixed it
     - Realise that we can loosen the filter length (256 -> 128) to get the right rejection
     - Set new coef to slx file
-    - Start fit
+  - Start fit
+  - Filter looks good now
+    - Can see HI, and radars
+    - ![Alt text](doc/20231110_235M_filter.png)
+
 
 ## 2023/11/06
 - ADC_receiver_V0
   - Output of dec_fir look good now regarding NCO
+    - Can see HI, and radars
   - However, the with of the filtrer is too narrow by a factor of 2 -> need to understand and fix that.
   - Change back dataformat to original configuration now that it is understood.
   - Use Q16.15 coefficients for receiver0
   - Start fit
   - Data still look good, but wrong dec_out snap data width.  Fix, increase depth and fit again  
-
 
 
 ## 2023/11/02
