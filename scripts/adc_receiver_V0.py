@@ -106,11 +106,6 @@ class NRT_channelizer(object):
                    'OneGbE_tx_full',
 
                    # Channelizer
-                   'select_4f64_nof_channels',
-                   'select_4f64_chan0_status',
-                   'select_4f64_chan1_status',
-                   'select_4f64_chan2_status',
-                   'select_4f64_chan3_status',
                    'sync_cnt',
                    'armed_sync_cnt',
                    #'TenGbE0_data_overflow',
@@ -223,50 +218,16 @@ if False:
   [ ADC.get_snapshot(count=100) for ADC in mydesign.ADCs ]
   [ ADC.dump_snapshot() for ADC in mydesign.ADCs ]
 
-
-
-Nfft = 4096
-
-[ ADC.get_snapshot() for ADC in mydesign.ADCs ]
 fig, axs = plt.subplots(nrows = len(mydesign.ADCs), 
                         ncols = 3,
                         sharex='col', sharey='col',
                         )
 
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
-  ADC_wave = ADC.wave.copy()
-
-  Nech_to_plot = 16384
-  ADC_axs[0].plot(np.arange(Nech_to_plot) / Fe * 1e6,
-                  ADC_wave[:Nech_to_plot],
-                  label=ADC.name)
-
-  cnt, bins, _ = ADC_axs[1].hist(ADC.wave, bins=np.arange(-128, 129) - 0.5)
-
-  nof_samples = len(ADC_wave)
-  f = np.arange(Nfft/2+1, dtype='float') / Nfft * Fe /1e6 
-  w = np.blackman(Nfft)
-  ADC_wave.shape = ((-1, Nfft))
-  DATA = np.fft.rfft(w * ADC_wave, axis=-1)
-  DATA = DATA.real**2 + DATA.imag**2
-  DATA = DATA.mean(axis=0)
-  ADC_axs[2].plot(f,
-                  10*np.log10(DATA),
-                  label=ADC.name)
-
-ADC_axs[0].set_xlabel(u"Time (us)")
-ADC_axs[0].set_xlim((0, (Nech_to_plot-1) / Fe * 1e6))
-ADC_axs[1].set_xlabel("ADC code")
-ADC_axs[1].set_xlim(bins[[0, -1]])
-ADC_axs[2].set_xlabel("Frequency (MHz)")
-ADC_axs[2].set_xlim((0, f[-1]))
-
-[ ADC_axs[0].set_ylabel("ADC code\nin [-128, 128[") for ADC_axs in axs ]
-[ ADC_axs[1].set_ylabel("Counts") for ADC_axs in axs ]
-[ ADC_axs[2].set_ylabel("Power (dB)") for ADC_axs in axs ]
-
+  ADC.plot_snapshot(ADC_axs)
 plt.tight_layout()
 plt.show(block=False)
+
 
 
 print('SEFRAM Configuration')
@@ -310,9 +271,9 @@ receiver_configs = [{"Fc":1.3e9, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
                     ]
 
 for receiver, config in zip(mydesign.Receivers, receiver_configs):
-  receiver.network_config()
-  receiver.clear()
-  receiver.scale = 0
+  #receiver.network_config(config["dst_IP"], config["dsp_port"])
+  #receiver.clear()
+  #receiver.scale = 0
   receiver.Fc = config["Fc"]
   receiver.network_config(config["dst_IP"], config["dsp_port"])
 
