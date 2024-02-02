@@ -30,6 +30,7 @@
 ################################################################################
 
 
+from configparser import Interpolation
 import time
 import numpy as np
 import struct
@@ -37,14 +38,19 @@ import sys
 import logging
 import pylab
 import matplotlib.pyplot as plt
+import matplotlib.dates
+import datetime
 import signal
 import imp
+import tqdm
 
 import casperfpga
 import ADC_clock
 import ADC
 import sefram
 import channelizer
+
+
 
 ADC_clock = imp.reload(ADC_clock)
 ADC = imp.reload(ADC)
@@ -53,7 +59,7 @@ channelizer = imp.reload(channelizer)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/adc_c9r_sst_v5/bit_files/adc_c9r_sst_v5_2022_Oct_12_1619.fpg"
+bitstream = "../bof/adc_receiver_v0/adc_receiver_v0_2023_Nov_09_2035.fpg"
 
 conf_Valon = True
 ADC_DVW_cal = True
@@ -222,7 +228,6 @@ fig, axs = plt.subplots(nrows = len(mydesign.ADCs),
                         ncols = 3,
                         sharex='col', sharey='col',
                         )
-
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
   ADC.plot_snapshot(ADC_axs)
 plt.tight_layout()
@@ -263,8 +268,7 @@ mydesign.SEFRAM.arm()    # à renomer
 
 
 print('Receivers Configuration')
-
-receiver_configs = [{"Fc":1.3e9, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
+receiver_configs = [{"Fc":1.421e9, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
                     {"Fc":1.4e9, "dst_IP": 0xc0a805b4, "dsp_port": 0xce01, },
                     {"Fc":1.5e9, "dst_IP": 0xc0a805b4, "dsp_port": 0xce02, },
                     {"Fc":1.6e9, "dst_IP": 0xc0a805b4, "dsp_port": 0xce03, },
@@ -275,8 +279,9 @@ for receiver, config in zip(mydesign.Receivers, receiver_configs):
   #receiver.clear()
   #receiver.scale = 0
   receiver.Fc = config["Fc"]
-  receiver.network_config(config["dst_IP"], config["dsp_port"])
-
+  receiver.Fc = 1.421e9 - 40e6
+  #receiver.kc = 450
+  
 
 # check that NCO tables are programmed properly
 if True:
@@ -501,13 +506,4 @@ mydesign.monitor()
 time.sleep(1)
 
 
-
-
-
-
-
-
 plt.show()
-
-
-
