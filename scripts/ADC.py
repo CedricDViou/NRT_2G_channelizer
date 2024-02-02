@@ -31,8 +31,10 @@
 
 
 import numpy as np
+import matplotlib.pyplot as plt
 import struct
 import adc5g
+import tqdm
 
 
 class ADC(object):
@@ -100,13 +102,47 @@ class ADC(object):
       nof_samples = tmp.shape[0]
       self.wave = np.empty((count, nof_samples), dtype='int8')
       self.wave[0] = tmp
-      for itt in range(1, count):
+      for itt in tqdm.tqdm(range(1, count)):
         data = self.snapshot.read_raw(man_valid=True, man_trig=True)
         self.wave[itt] = np.frombuffer(data[0]['data'], dtype='int8')
 
   def dump_snapshot(self):
     if self.wave is not None:
       self.wave.tofile(self.snapshot.name + "_data.bin", sep = '')
+
+  def plot_snapshot(self, axs):
+    self.get_snapshot()
+    ADC_wave = self.wave.copy()
+    Nfft = 4096
+    Nech_to_plot = 16384
+
+    axs[0].plot(np.arange(Nech_to_plot) / self.Fe * 1e6,
+                ADC_wave[:Nech_to_plot],
+                label=self.name)
+
+    cnt, bins, _ = axs[1].hist(self.wave, bins=np.arange(-128, 129) - 0.5)
+
+    nof_samples = len(ADC_wave)
+    f = np.arange(Nfft/2+1, dtype='float') / Nfft * self.Fe /1e6 
+    w = np.blackman(Nfft)
+    ADC_wave.shape = ((-1, Nfft))
+    DATA = np.fft.rfft(w * ADC_wave, axis=-1)
+    DATA = DATA.real**2 + DATA.imag**2
+    DATA = DATA.mean(axis=0)
+    axs[2].plot(f,
+                10*np.log10(DATA),
+                label=self.name)
+
+    axs[0].set_xlabel(u"Time (us)")
+    axs[0].set_xlim((0, (Nech_to_plot-1) / self.Fe * 1e6))
+    axs[1].set_xlabel("ADC code")
+    axs[1].set_xlim(bins[[0, -1]])
+    axs[2].set_xlabel("Frequency (MHz)")
+    axs[2].set_xlim((0, f[-1]))
+    
+    axs[0].set_ylabel("ADC code\nin [-128, 128[")
+    axs[1].set_ylabel("Counts")
+    axs[2].set_ylabel("Power (dB)")
 
   @property
   def adcmode(self):
