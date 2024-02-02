@@ -234,20 +234,22 @@ class pulsar_channelizer(object):
 
 
 class receiver(object):
-  def __init__(self, fpga=None, Fe=None, receiver_basename='channelizer_', NCO_basename='rescale_', DDC_basename='select_4f64_', network_basename='TenGbE0_'):
+  def __init__(self, fpga=None, Fe=None, decimation=None, receiver_basename='receiver_', NCO_basename='L0_%d_mem', HB_basename='HB_', network_basename='TenGbE0_'):
     assert fpga is not None
     assert Fe is not None
+    assert decimation is not None
     self.fpga = fpga
     self.Fe = int(Fe)
     self.receiver_basename = receiver_basename
-    self.NCO_basename = NCO_basename
-    self.DDC_basename = DDC_basename
+    self.NCO_basename = self.receiver_basename + NCO_basename
+    self.HB_basename = self.receiver_basename + HB_basename
     self.network_basename = network_basename
     self.scale_basename = self.receiver_basename+'bitselect'
-    self.kc = 0
+    self._kc = 0
     self.K = 1024     # NCO can be configured from 0 to K-1
     self.NCO_par = 16 # NCO processes 16 samples in //
     self.NCO_tables = None
+    self.decimation = decimation  # receiver1_decim_4x_true
 
 
   def __str__(self):
@@ -255,21 +257,21 @@ class receiver(object):
 
 
   def __repr__(self):
-    return "Receiver(fpga=%s, Fe=%d, receiver_basename=\'%s\', NCO_basename=\'%s\', DDC_basename=\'%s\', network_basename=\'%s\')" % (
+    return "Receiver(fpga=%s, Fe=%d, receiver_basename=\'%s\', NCO_basename=\'%s\', HB_basename=\'%s\', network_basename=\'%s\')" % (
             str(self.fpga),
             self.Fe,
             self.receiver_basename,
             self.NCO_basename,
-            self.DDC_basename,
+            self.HB_basename,
             self.network_basename,
             )
 
 
   def disable(self):
-    raise('NOT IMPLEMENTED')
+    raise Exception('NOT IMPLEMENTED')
 
   def enable(self):
-    raise('NOT IMPLEMENTED')
+    raise Exception('NOT IMPLEMENTED')
 
   def NCO_calc_tables(self):
     NCO_w = 16
@@ -279,38 +281,118 @@ class receiver(object):
     L0_mem = np.exp(2j*np.pi*(-self.kc) * np.arange(self.K * self.NCO_par) / self.K)
     L0_mem = L0_mem.reshape((self.K, self.NCO_par))
     L0_mem_ReIm = L0_mem.view(np.float64).reshape((self.K, self.NCO_par, ReIm))
-    L0_mem_ImRe = L0_mem_ReIm[:,:,-1::-1]
-    L0_mem_ImRe_int = np.round(L0_mem_ImRe * Max_NCO_val)
-    L0_mem_ImRe_int16 = L0_mem_ImRe_int.astype(np.int16)
-    L0_mem_uint32 = L0_mem_ImRe_int16.view(np.uint32)[...,0]
-    self.NCO_tables = L0_mem_uint32.T
+    L0_mem_ReIm_int = np.round(L0_mem_ReIm * Max_NCO_val)
+    L0_mem_ReIm_int16 = L0_mem_ReIm_int.astype(np.int16)
+    self.NCO_tables = L0_mem_ReIm_int16.transpose((1,0,2)).copy()
 
   def NCO_write_tables(self):
+    L0_mem_uint32 = self.NCO_tables.view(np.uint16).byteswap()  # byte swap 16-bit data
     if self.NCO_tables is not None:
-      for table_idx, table_content in enumerate(self.NCO_tables):
-        self.fpga.write(self.NCO_basename + '%d'%table_idx, table_content)
-    raise('NOT TESTED')
+      for table_idx, table_content in enumerate(L0_mem_uint32):
+        bin_content = table_content.tobytes()
+        self.fpga.blindwrite(self.NCO_basename % table_idx, bin_content)
+    #raise Exception('NOT TESTED')
 
   def NCO_read_tables(self):
-    tables = []
+    self.NCO_tables = np.empty((self.NCO_par, self.K, 2), dtype=np.int16)
     for table_idx in range(self.NCO_par):
-        table_content = self.fpga.read(self.NCO_basename + '%d'%table_idx, self.K * 8)
-        tables.append(table_content)
-    raise('NOT TESTED')
-    return tables
+        bin_content = self.fpga.read(self.NCO_basename % table_idx, self.K * 4, 0, unsigned=False)
+        table_content = np.frombuffer(bin_content, dtype=np.int16).byteswap()  # byte swap 16-bit data
+        table_content = table_content.reshape((self.K, 2))
+        self.NCO_tables[table_idx] = table_content
+    #raise Exception('NOT TESTED')
+
+  def test_L0_i_mem(self, dat_in, mem_idx=0, nof_read = 10):
+    # Write
+    self.fpga.blindwrite(self.NCO_basename % mem_idx, dat_in.tobytes())
+    # reads
+    dat_outs = []
+    nof_word = len(dat_in)
+    for read_idx in range(nof_read):
+      dat_out = self.fpga.read(self.NCO_basename % mem_idx, nof_word, 0, unsigned=True)
+      dat_out = np.frombuffer(dat_out, dtype=np.int8)
+      dat_outs.append(dat_out)
+    # prints
+    l = "   W@ :   wr : "
+    for read_idx in range(nof_read):
+      l += ("rd%02d " % read_idx)
+    print(l)
+    for word_idx in range(nof_word):
+      l = ("0x%03X : " % word_idx) + ("%4d : " % dat_in[word_idx])
+      for read_idx in range(nof_read):
+        l += ("%4d " % dat_outs[read_idx][word_idx])
+      print(l)
+
+  def get_snapshot(self, snap_name="dec_out", count=1, man_valid=True, man_trig=True, raw_fmt=False):
+    snap = self.fpga.snapshots[self.receiver_basename + snap_name]
+    data = snap.read_raw(man_valid=man_valid, man_trig=man_trig)
+
+    if snap_name == 'dec_out':
+      dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
+    elif snap_name == "decim_out":
+      dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
+    elif snap_name == "decim_4x_HB2_out":
+      dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
+    elif snap_name == "decim_4x_HB1_out":
+      dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
+    elif snap_name == "decim_4x_HB0_out":
+      dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
+    elif snap_name == "valid_out":
+      dt, shape, d_w, d_dp = np.dtype('int8'), (-1), 8, 0
+    elif snap_name == "L0_0_din0_in":
+      dt, shape, d_w, d_dp = np.dtype('int32'), (-1), 8, 7
+    elif snap_name == "L0_0_mult_out":
+      dt, shape, d_w, d_dp = np.dtype('int32'), (-1), 24, 22
+    elif snap_name == "L0_0_cast_out":
+      dt, shape, d_w, d_dp = np.dtype('int32'), (-1), 16, 15
+    elif snap_name == "dec_fir0_sum_out":
+      dt, shape, d_w, d_dp = np.dtype('int64'), (-1), 40, 30 
+    elif snap_name == "dec_fir0_sr5_out":
+      dt, shape, d_w, d_dp = np.dtype('int64'), (-1), 40, 30
+        
+    dt = dt.newbyteorder('>')
+    tmp = np.frombuffer(data[0]['data'], dtype=dt).copy()
+    if raw_fmt:
+      return tmp
+
+    tmp[tmp>2**(d_w-1)-1] -= 2**d_w
+    tmp = tmp / 2.0**d_dp
+    tmp = tmp.reshape(shape)
+    return (d_w, d_dp), tmp
 
 
   @property
   def Fc(self):
-    return self.kc / self.K * self.Fe
+    return float(self.kc) / self.K * self.Fe
   
   @Fc.setter 
   def Fc(self, value):
-    self.kc = round(value / self.Fe * self.K)
-    # self.NCO_calc_tables()
-    # self.NCO_write_tables()
+    self.kc = int(value / self.Fe * self.K)
 
+  @property
+  def kc(self):
+    return self._kc
   
+  @kc.setter 
+  def kc(self, value):
+    assert type(value) is int
+    self._kc = value
+    self.NCO_calc_tables()
+    self.NCO_write_tables()
+
+  @property
+  def decimation(self):
+    return self._decimation
+  
+  @decimation.setter 
+  def decimation(self, value):
+    configs = {2: 0,
+               8: 1,
+               }
+    assert value in configs.keys()
+    self._decimation = value
+    self.fpga.write_int( self.receiver_basename + "decim_4x_true", configs[value])
+
   @property
   def scale(self):
     self._scale = self.fpga.read_uint(self.scale_basename)
@@ -319,14 +401,14 @@ class receiver(object):
   @scale.setter 
   def scale(self, value):
     self._scale = value
-    raise('NOT IMPLEMENTED')
+    raise Exception('NOT IMPLEMENTED')
     self.fpga.write_int(self.scale_basename, self._scale)
 
 
   def force_eof(self):
-    raise('NOT IMPLEMENTED')
+    raise Exception('NOT IMPLEMENTED')
 
   def network_config(self, dst_IP, dst_port):
-    raise('NOT IMPLEMENTED')
+    raise Exception('NOT IMPLEMENTED')
 
 
