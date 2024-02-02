@@ -59,7 +59,8 @@ conf_Valon = True
 ADC_DVW_cal = True
 ADC_OGP_cal = True
 
-Fe = 3580000000.0 # Hz
+#FEED, Fe = 'HF', 3200000000.0 # 1.6-3.2  GHz
+FEED, Fe = 'BF', 3700000000.0 #   0-1.85 GHz
 F_valon = Fe / 2
 Fsys = F_valon / 8
 Fin = 130000000# Hz
@@ -75,14 +76,7 @@ if conf_Valon:
 Valon.print_config()
 
 
-lh = logging.StreamHandler()
-logger = logging.getLogger(roach2)
-logger.addHandler(lh)
-logger.setLevel(10)
-
-
-
-# make class to control CASPER FPGA design for NRT channelizer
+# class to control CASPER FPGA design for NRT channelizer
 class NRT_channelizer(object):
   def __init__(self, name, bitstream=None, Fe=None, feed='BF'):
     self.name = name
@@ -120,17 +114,17 @@ class NRT_channelizer(object):
                    'sync_cnt',
                    'channelizer_ovr',
                    'armed_sync_cnt',
-                   'TenGbE0_data_overflow',
-                   'TenGbE0_tx_afull',
-                   'TenGbE0_tx_overflow',
+                   #'TenGbE0_data_overflow',
+                   #'TenGbE0_tx_afull',
+                   #'TenGbE0_tx_overflow',
                    )
 
     # Add peripherals and submodules
     self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe, snap_basename='adcsnap'),
                  ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe, snap_basename='adcsnap'))
     self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
-    self.Receivers = [channelizer.receiver(fpga=self.fpga, Fe=self.Fe),
-                      channelizer.receiver(fpga=self.fpga, Fe=self.Fe),
+    self.Receivers = [channelizer.receiver(fpga=self.fpga, Fe=self.Fe, receiver_basename="receiver0_"),
+                      #channelizer.receiver(fpga=self.fpga, Fe=self.Fe, receiver_basename="receiver1_"),
                       ]
 
 
@@ -178,11 +172,40 @@ class NRT_channelizer(object):
       ADC.adcmode=adcmode[self._feed]
 
 
+  def input_sel(self, source='ADC'):
+    if source == 'ADC':
+      self.fpga.write_int('din_sel', 0)
+    elif source == 'Arb_gen':
+      self.fpga.write_int('din_sel', 1)
+
+  def conf_arb_gen(self, **kwargs):
+    ADDR_W = 8
+    nof_samples_per_w = 16
+    dt, shape, d_w, d_dp = np.dtype('int8'), (2**ADDR_W, nof_samples_per_w), 8, 7
+
+    assert "mode" in kwargs, "mode kwarg must be specified"
+    if kwargs["mode"] == "constant":
+      assert "amp" in kwargs, "amp kwarg must be specified for mode \"constant\""
+      constant = kwargs['amp']
+      data = np.full((2**ADDR_W) * nof_samples_per_w, constant, dtype=dt)
+      data.shape = shape
+      bin_content = data.tobytes()
+    else:
+      raise ValueError("Mode %s is not supported" % (kwargs["mode"]))
+
+    self.fpga.blindwrite("arb_gen0_mem", bin_content)
+    self.fpga.blindwrite("arb_gen1_mem", bin_content)
+
+
+
 mydesign = NRT_channelizer(
   roach2,
   bitstream=bitstream,
   Fe=Fe
   )
+
+mydesign.feed = FEED
+
 
 dev = mydesign.listdev()
 for d in dev:
