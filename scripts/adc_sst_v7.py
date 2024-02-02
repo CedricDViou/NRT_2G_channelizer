@@ -60,7 +60,8 @@ ADC_cal = True
 
 conf_Valon = True
 
-Fe = 3600000000.0 # Hz
+#FEED, Fe = 'HF', 3200000000.0 # 1.6-3.2  GHz
+FEED, Fe = 'BF', 3700000000.0 #   0-1.85 GHz
 F_valon = Fe / 2
 Fsys = F_valon / 8
 Fin = 130000000# Hz
@@ -113,7 +114,7 @@ class adc_sst_v7(object):
     # Add peripherals and submodules
     self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe),
                  ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe))
-    self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
+    self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe, packetizer_basename='pcktizer_')
 
     # init modules
     self.SEFRAM.disable()
@@ -176,50 +177,24 @@ if ADC_cal:
 
 Nfft = 4096
 nof_lanes = 8
+mydesign.feed = FEED
 
-mydesign.feed = 'BF'
-# mydesign.feed = 'HF'
 
-[ ADC.get_snapshot() for ADC in mydesign.ADCs ]
+if False:
+  [ ADC.get_snapshot(count=100) for ADC in mydesign.ADCs ]
+  [ ADC.dump_snapshot() for ADC in mydesign.ADCs ]
+
+
 fig, axs = plt.subplots(nrows = len(mydesign.ADCs), 
-                        ncols = 3,
+                        ncols = 3, # wave, histogram, spectrum
                         sharex='col', sharey='col',
                         )
-
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
-    ADC_wave = ADC.wave.copy()
-
-    Nech_to_plot = 16384
-    ADC_axs[0].plot(np.arange(Nech_to_plot) / Fe * 1e6,
-                    ADC_wave[:Nech_to_plot],
-                    label=ADC.name)
-
-    cnt, bins, _ = ADC_axs[1].hist(ADC.wave, bins=np.arange(-128, 129) - 0.5)
-
-    nof_samples = len(ADC_wave)
-    f = np.arange(Nfft/2+1, dtype='float') / Nfft * Fe /1e6 
-    w = np.blackman(Nfft)
-    ADC_wave.shape = ((-1, Nfft))
-    DATA = np.fft.rfft(w * ADC_wave, axis=-1)
-    DATA = DATA.real**2 + DATA.imag**2
-    DATA = DATA.mean(axis=0)
-    ADC_axs[2].plot(f,
-                    10*np.log10(DATA),
-                    label=ADC.name)
-
-ADC_axs[0].set_xlabel(u"Time (us)")
-ADC_axs[0].set_xlim((0, (Nech_to_plot-1) / Fe * 1e6))
-ADC_axs[1].set_xlabel("ADC code")
-ADC_axs[1].set_xlim(bins[[0, -1]])
-ADC_axs[2].set_xlabel("Frequency (MHz)")
-ADC_axs[2].set_xlim((0, f[-1]))
-
-[ ADC_axs[0].set_ylabel("ADC code\nin [-128, 128[") for ADC_axs in axs ]
-[ ADC_axs[1].set_ylabel("Counts") for ADC_axs in axs ]
-[ ADC_axs[2].set_ylabel("Power (dB)") for ADC_axs in axs ]
-
+  ADC.plot_snapshot(ADC_axs)
 plt.tight_layout()
 plt.show(block=False)
+
+1/0
 
 
 print('SEFRAM Configuration')
@@ -272,7 +247,11 @@ mydesign.monitor()
 mydesign.SEFRAM.enable()
 
 mydesign.SEFRAM.time = "now"  # set time to current UNIX timestamp
-print(mydesign.SEFRAM.time)
+#print(mydesign.SEFRAM.time)
+ts         = mydesign.fpga.read_uint('frmr_pcktizer_cur_timestamp')
+sample_cnt = mydesign.fpga.read_uint('frmr_pcktizer_cur_smpl_cnt')
+sysfreq    = mydesign.fpga.read_uint('frmr_pcktizer_cur_smpl_per_sec')
+print( ts + float(sample_cnt) / (sysfreq+1) )
 
 
 time.sleep(1)
