@@ -47,11 +47,11 @@ def int2ip(addr):
 
 
 class sefram(object):
-  def __init__(self, fpga=None, Fe=None, vacc_n_framer_basename='frmr_', channelizer_basename='SEFRAM_', network_basename='OneGbE_'):
+  def __init__(self, fpga=None, Fe=None, vacc_n_framer_basename='frmr_', channelizer_basename='SEFRAM_', network_basename='OneGbE_', packetizer_basename='pck_'):
     assert fpga is not None
     self.fpga = fpga
     self.vacc_n_framer_basename = vacc_n_framer_basename
-    self.packetizer_basename = 'pck_'
+    self.packetizer_basename = packetizer_basename
     self.channelizer_basename = channelizer_basename
     self.network_basename = network_basename
     self.Fe = int(Fe)
