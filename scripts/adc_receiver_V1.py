@@ -61,14 +61,14 @@ histogram = imp.reload(histogram)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Jan_30_1956.fpg"
+bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_03_1855.fpg"
 
 conf_Valon = True
 ADC_DVW_cal = True
 ADC_OGP_cal = True
 
-FEED, Fe = 'HF', 3200000000.0 # 1.6-3.2  GHz
-#FEED, Fe = 'BF', 3700000000.0 #   0-1.85 GHz
+#FEED, Fe = 'HF', 3200000000.0 # 1.6-3.2  GHz
+FEED, Fe = 'BF', 3700000000.0 #   0-1.85 GHz
 F_valon = Fe / 2
 Fsys = F_valon / 8
 Fin = 130000000# Hz

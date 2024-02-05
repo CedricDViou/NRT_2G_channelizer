@@ -249,7 +249,7 @@ class receiver(object):
     self.K = 1024     # NCO can be configured from 0 to K-1
     self.NCO_par = 16 # NCO processes 16 samples in //
     self.NCO_tables = None
-    self.decimation = decimation  # receiver1_decim_4x_true
+    self.decimation = decimation  # receiver1_HBs_true
 
 
   def __str__(self):
@@ -331,11 +331,11 @@ class receiver(object):
       dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
     elif snap_name == "decim_out":
       dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
-    elif snap_name == "decim_4x_HB2_out":
+    elif snap_name == "HBs_HB2_out":
       dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
-    elif snap_name == "decim_4x_HB1_out":
+    elif snap_name == "HBs_HB1_out":
       dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
-    elif snap_name == "decim_4x_HB0_out":
+    elif snap_name == "HBs_HB0_out":
       dt, shape, d_w, d_dp = np.dtype('int16'), (-1, 4), 16, 15
     elif snap_name == "valid_out":
       dt, shape, d_w, d_dp = np.dtype('int8'), (-1), 8, 0
@@ -391,7 +391,7 @@ class receiver(object):
                }
     assert value in configs.keys()
     self._decimation = value
-    self.fpga.write_int( self.receiver_basename + "decim_4x_true", configs[value])
+    self.fpga.write_int( self.receiver_basename + "HBs_true", configs[value])
 
   @property
   def scale(self):
