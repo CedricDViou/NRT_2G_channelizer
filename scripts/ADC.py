@@ -67,13 +67,13 @@ class ADC(object):
                     'gain': {1:0, 2:0, 3:0, 4:0},
                     'phase': {1:0, 2:0, 3:0, 4:0},
                     }
-    self.ADC_read = {'offset': adc5g.spi.get_spi_offset,
-                    'gain': adc5g.spi.get_spi_gain,
-                    'phase': adc5g.spi.get_spi_phase,
+    self.ADC_read = {'offset': self.get_spi_offset_reg,
+                    'gain': self.get_spi_gain_reg,
+                    'phase': self.get_spi_phase_reg,
                     }                
-    self.ADC_write = {'offset': adc5g.spi.set_spi_offset,
-                      'gain': adc5g.spi.set_spi_gain,
-                      'phase': adc5g.spi.set_spi_phase,
+    self.ADC_write = {'offset': self.set_spi_offset_reg,
+                      'gain': self.set_spi_gain_reg,
+                      'phase': self.set_spi_phase_reg,
                       }                
   
     self.ADC_nof_bits = 8
@@ -138,6 +138,36 @@ class ADC(object):
   def dump_snapshot(self):
     if self.wave is not None:
       self.wave.tofile(self.snapshot.name + "_data.bin", sep = '')
+
+  def set_spi_phase_reg(self, roach, zdok_n, chan, reg_val):
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CHANSEL_REG_ADDR, chan)
+    adc5g.set_spi_register(roach, zdok_n, adc5g.EXTPHAS_REG_ADDR, reg_val)
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CALCTRL_REG_ADDR, 2<<6)
+
+  def get_spi_phase_reg(self, roach, zdok_n, chan):
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CHANSEL_REG_ADDR, chan)
+    reg_val = adc5g.get_spi_register(roach, zdok_n, adc5g.EXTPHAS_REG_ADDR-0x80)
+    return reg_val
+
+  def set_spi_offset_reg(self, roach, zdok_n, chan, reg_val):
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CHANSEL_REG_ADDR, chan)
+    adc5g.set_spi_register(roach, zdok_n, adc5g.EXTOFFS_REG_ADDR, reg_val)
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CALCTRL_REG_ADDR, 2<<2)
+
+  def get_spi_offset_reg(self, roach, zdok_n, chan):
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CHANSEL_REG_ADDR, chan)
+    reg_val = adc5g.get_spi_register(roach, zdok_n, adc5g.EXTOFFS_REG_ADDR-0x80)
+    return reg_val
+
+  def set_spi_gain_reg(self, roach, zdok_n, chan, reg_val):
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CHANSEL_REG_ADDR, chan)
+    adc5g.set_spi_register(roach, zdok_n, adc5g.EXTGAIN_REG_ADDR, reg_val)
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CALCTRL_REG_ADDR, 2<<4)
+
+  def get_spi_gain_reg(self, roach, zdok_n, chan):
+    adc5g.set_spi_register(roach, zdok_n, adc5g.CHANSEL_REG_ADDR, chan)
+    reg_val = adc5g.get_spi_register(roach, zdok_n, adc5g.EXTGAIN_REG_ADDR-0x80)
+    return reg_val
 
   def create_calibration_GUI(self):
     self.fig, self.axs = plt.subplots(figsize=(20, 8), #   muADC1,   muADC2,    muADC3,   muADC4
