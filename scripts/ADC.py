@@ -216,6 +216,10 @@ class ADC(object):
     axs[2].set_ylabel("Power (dB)")
     axs[2].set_ylim((20, 80))
 
+  def clear_data(self, event=None):
+    plt.close(self.fig)
+    self.create_calibration_GUI()
+
   def update_data(self, event=None):
     self.get_snapshot(count=10)
     self.update_interleaved_data()
@@ -302,7 +306,7 @@ class ADC(object):
 
   def callback_scroll(self, event):
     self.event = event
-    print(event)
+    # print(event)
     action, core, direction = None, None, None
     for axs_row, _action in zip(self.axs[:2], ('offset', 'gain')):
       if event.inaxes in axs_row:
@@ -312,7 +316,7 @@ class ADC(object):
             direction = event.button
 
     if type is not None:  # then we are modifying one of the calibration parameters of one ADC core
-      print("Action %s, core %d, direction %s" % (str(action), core, direction))
+      # print("Action %s, core %d, direction %s" % (str(action), core, direction))
       old_value = self.ADC_read[action](self.fpga, self.zdok_n, core)
       new_value = old_value - 1 if direction == u'up' else old_value + 1
       self.ADC_write[action](self.fpga, self.zdok_n, core, new_value)
