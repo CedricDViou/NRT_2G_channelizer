@@ -131,7 +131,7 @@ class ADC(object):
     self.wave = np.empty((count, nof_samples), dtype='int8')
     self.wave[0] = tmp
     if count > 1:
-      for itt in tqdm.tqdm(range(1, count)):
+      for itt in tqdm.tqdm(range(1, count), disable=(count>=10)):
         data = self.snapshot.read_raw(man_valid=True, man_trig=True)
         self.wave[itt] = np.frombuffer(data[0]['data'], dtype='int8')
 
