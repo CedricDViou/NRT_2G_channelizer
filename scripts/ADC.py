@@ -59,17 +59,17 @@ class ADC(object):
     self.adcmode_codes = {0b1000: 'I',
                           0b1010: 'Q',
                           }
-    self._adcmode=adcmode            
+    self._adcmode=adcmode
 
     self.ADC_nof_cores = 4
     self.ADC_cores = (1, 3, 2, 4)
-    self.ADC_OGP = {'offset': {1:0, 2:0, 3:0, 4:0},
-                    'gain': {1:0, 2:0, 3:0, 4:0},
-                    'phase': {1:0, 2:0, 3:0, 4:0},
+    self.ADC_OGP = {'offset': {1: 128, 2: 128, 3: 128, 4: 128},
+                      'gain': {1: 128, 2: 128, 3: 128, 4: 128},
+                     'phase': {1: 128, 2: 128, 3: 128, 4: 128},
                     }
     self.ADC_read = {'offset': self.get_spi_offset_reg,
-                    'gain': self.get_spi_gain_reg,
-                    'phase': self.get_spi_phase_reg,
+                       'gain': self.get_spi_gain_reg,
+                      'phase': self.get_spi_phase_reg,
                     }                
     self.ADC_write = {'offset': self.set_spi_offset_reg,
                       'gain': self.set_spi_gain_reg,
