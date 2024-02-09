@@ -76,8 +76,8 @@ class ADC(object):
                       'phase': self.get_spi_phase_reg,
                     }                
     self.ADC_write = {'offset': self.set_spi_offset_reg,
-                      'gain': self.set_spi_gain_reg,
-                      'phase': self.set_spi_phase_reg,
+                        'gain': self.set_spi_gain_reg,
+                       'phase': self.set_spi_phase_reg,
                       }                
   
     self.ADC_nof_bits = 8

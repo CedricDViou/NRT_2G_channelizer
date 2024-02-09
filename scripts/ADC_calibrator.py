@@ -140,9 +140,12 @@ class adc_calibrator(object):
     adcmode = {'BF': 'I',
                'HF': 'Q',
                }
+    NY_Zone = {'BF': 1,
+               'HF': 2,
+               }
     for ADC in self.ADCs:
-      ADC.adcmode=adcmode[self._feed]
-      ADC.adcmode=adcmode[self._feed]
+      ADC.adcmode = adcmode[value]
+      ADC.NY_Zone = NY_Zone[value]
 
 
 
@@ -169,10 +172,10 @@ mydesign.feed = FEED
 import ADC
 ADC = imp.reload(ADC)
 myADC0 = ADC.ADC(fpga=mydesign.fpga, zdok_n=0, Fe=mydesign.Fe, snap_basename='adcsnap')
+myADC0.NY_Zone = 2
 myADC0.create_calibration_GUI()
 myADC1 = ADC.ADC(fpga=mydesign.fpga, zdok_n=1, Fe=mydesign.Fe, snap_basename='adcsnap')
 myADC1.create_calibration_GUI()
-plt.show(block=False)
 self = myADC0
 
 1/0
