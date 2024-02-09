@@ -46,6 +46,10 @@ class ADC(object):
     self.fpga = fpga
     self.zdok_n = zdok_n
     self.Fe = Fe
+    self.Nfft = 4096
+    self.Nech_to_plot = 16384
+    self.f = []
+    self.NY_Zone = 1  # 1: default for baseband sampling [0-Fe/2], 2: [Fe/2, Fe], ...
     self.name = 'ADC%d' % self.zdok_n
     self.snap_basename = snap_basename
     self.snapshot = fpga.snapshots[snap_basename+'%d' % self.zdok_n]
@@ -79,9 +83,6 @@ class ADC(object):
     self.ADC_nof_bits = 8
     self.ADC_bins = np.arange(-2**(self.ADC_nof_bits-1), 2**(self.ADC_nof_bits-1)+1) - 0.5
 
-    self.Nfft = 4096
-    self.Nech_to_plot = 16384
-    self.f = np.arange(self.Nfft/2+1, dtype='float') / self.Nfft * self.Fe /1e6 
     self.window = np.blackman(self.Nfft)
 
     # set by plot_snapshot and used by update_snapshot 
@@ -230,6 +231,8 @@ class ADC(object):
     DATA = DATA.real**2 + DATA.imag**2
     DATA = DATA.mean(axis=0)
     DATA = 10*np.log10(DATA)
+    if self.NY_Zone % 2 == 0:  # reverse frequency axis
+      DATA = DATA[..., ::-1]
     self.line_ADC_DSP = axs[2].plot(self.f,
                                     DATA.T,
                                     '-', linewidth=1,
@@ -273,6 +276,8 @@ class ADC(object):
     DATA = DATA.real**2 + DATA.imag**2
     DATA = DATA.mean(axis=0)
     DATA = 10*np.log10(DATA)
+    if self.NY_Zone % 2 == 0:  # reverse frequency axis
+      DATA = DATA[..., ::-1]
     for l, data in zip(self.line_ADC_DSP, DATA):
       l.set_ydata(data)
 
@@ -332,7 +337,7 @@ class ADC(object):
   def clear_OPB(self, event=None):
     for action in ('offset', 'gain', 'phase'):
       for core in self.ADC_cores:
-        self.ADC_write[action](self.fpga, self.zdok_n, core, 0)
+        self.ADC_write[action](self.fpga, self.zdok_n, core, 128)
     self.update_data()
 
 
@@ -372,3 +377,16 @@ class ADC(object):
     adc5g.spi.set_spi_control(self.fpga,
                               self.zdok_n,
                               adcmode=self.adcmodes[self._adcmode])
+
+  @property
+  def NY_Zone(self):
+    return self._NY_Zone
+
+  @NY_Zone.setter
+  def NY_Zone(self, value):
+    if type(value) is not int :
+      raise ValueError("Nyquist Zone can only be integer type")
+    self._NY_Zone = value
+    f = np.arange(0, self.Nfft/2+1, 1, dtype='float') / self.Nfft * (self.Fe/1e6)
+    F_offset = float(value-1)/2 * self.Fe/1e6
+    self.f = F_offset + f
