@@ -111,7 +111,11 @@ class ADC(object):
     data = struct.unpack('%ib' %grab['length'], grab['data'])
     return data
 
-  def run_DVW_calibration(self, event=None):
+  def DVW_calibration(self, event=None):
+    self.run_DVW_calibration()
+    self.update_data()
+
+  def run_DVW_calibration(self):
     # Calibrate ADC DVW
     # from https://github.com/Smithsonian/adc_tests
     # forked here https://github.com/CedricDViou/adc_tests
@@ -185,7 +189,7 @@ class ADC(object):
 
     axDVW_cal = self.fig.add_axes([0.01, 0.05, 0.1, 0.05])
     bDVW_cal = Button(axDVW_cal, 'DVW calibration')
-    bDVW_cal.on_clicked(self.run_DVW_calibration)
+    bDVW_cal.on_clicked(self.DVW_calibration)
 
     axupdate_data = self.fig.add_axes([0.01, 0.10, 0.1, 0.05])
     bupdate_data = Button(axupdate_data, 'Update')
