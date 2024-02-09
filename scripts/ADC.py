@@ -209,14 +209,13 @@ class ADC(object):
     self.cidweel = self.fig.canvas.mpl_connect('scroll_event', self.callback_scroll)
 
     self.get_snapshot(count=10)
-    self.plot_interleaved_data()
-    self.plot_ADC_Core_data()
+    self.plot_interleaved_data(self.axs[-1][1:])
+    self.plot_ADC_Core_data(self.axs[:2])
 
     plt.show(block=False)
 
 
-  def plot_interleaved_data(self):
-    axs = self.axs[-1][1:]
+  def plot_interleaved_data(self, axs):
     ADC_wave = self.wave.copy()
 
     self.line_ADC_code = axs[0].plot(np.arange(self.Nech_to_plot) / self.Fe * 1e6,
@@ -277,8 +276,7 @@ class ADC(object):
     for l, data in zip(self.line_ADC_DSP, DATA):
       l.set_ydata(data)
 
-  def plot_ADC_Core_data(self):
-    axs = self.axs[:2]
+  def plot_ADC_Core_data(self, axs):
     ADC_wave = self.wave.copy()
     nof_trig, nof_samples = ADC_wave.shape
     nof_samples = nof_samples//self.ADC_nof_cores
