@@ -175,6 +175,7 @@ myADC0 = ADC.ADC(fpga=mydesign.fpga, zdok_n=0, Fe=mydesign.Fe, snap_basename='ad
 myADC0.NY_Zone = 2
 myADC0.create_calibration_GUI()
 myADC1 = ADC.ADC(fpga=mydesign.fpga, zdok_n=1, Fe=mydesign.Fe, snap_basename='adcsnap')
+myADC1.NY_Zone = 2
 myADC1.create_calibration_GUI()
 self = myADC0
 
@@ -190,3 +191,19 @@ for ADC_axs, ADC in zip(axs, mydesign.ADCs):
 plt.tight_layout()
 plt.show(block=False)
 
+
+for PA in (-4, -1, 2, 5):
+  Valon.set_config(FA=F_valon/1e6,
+                   PA=PA, # -4, -1, 2, 5
+                   FB=Fin/1e6,
+                   PB=-4,
+                   )
+  time.sleep(2)
+  myADC1 = ADC.ADC(fpga=mydesign.fpga, zdok_n=1, Fe=mydesign.Fe, snap_basename='adcsnap')
+  myADC1.create_calibration_GUI()
+
+Valon.set_config(FA=F_valon/1e6,
+                 PA=-4, # -4, -1, 2, 5
+                 FB=Fin/1e6,
+                 PB=-4,
+                 )
