@@ -62,6 +62,8 @@ histogram = imp.reload(histogram)
 
 roach2 = "192.168.40.71"
 bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_03_1855.fpg"
+bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_05_1210.fpg"
+bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_16_1505.fpg"
 
 conf_Valon = True
 ADC_DVW_cal = True
@@ -116,9 +118,10 @@ class NRT_channelizer(object):
                    # Channelizer
                    'sync_cnt',
                    'armed_sync_cnt',
-                   #'TenGbE0_data_overflow',
-                   #'TenGbE0_tx_afull',
-                   #'TenGbE0_tx_overflow',
+                   'TenGbE0_gbe0_tx_cnt',
+                   'TenGbE0_data_overflow',
+                   'TenGbE0_tx_afull',
+                   'TenGbE0_tx_overflow',
                    )
 
     # Add peripherals and submodules
