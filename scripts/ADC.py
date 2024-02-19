@@ -114,7 +114,8 @@ class ADC(object):
 
   def DVW_calibration(self, event=None):
     self.run_DVW_calibration()
-    self.update_data()
+    if event is not None:
+      self.update_data()
 
   def run_DVW_calibration(self):
     # Calibrate ADC DVW
@@ -132,11 +133,11 @@ class ADC(object):
     self.nof_trig = count
     data = self.snapshot.read_raw(man_valid=True, man_trig=True)
     tmp = np.frombuffer(data[0]['data'], dtype='int8')
-    nof_samples = tmp.shape[0]
-    self.wave = np.empty((count, nof_samples), dtype='int8')
+    self.nof_samples = tmp.shape[0]
+    self.wave = np.empty((self.nof_trig, self.nof_samples), dtype='int8')
     self.wave[0] = tmp
-    if count > 1:
-      for itt in tqdm.tqdm(range(1, count), disable=(count>=10)):
+    if self.nof_trig > 1:
+      for itt in tqdm.tqdm(range(1, self.nof_trig), disable=(self.nof_trig<=10)):
         data = self.snapshot.read_raw(man_valid=True, man_trig=True)
         self.wave[itt] = np.frombuffer(data[0]['data'], dtype='int8')
 
@@ -188,24 +189,40 @@ class ADC(object):
         a.grid('on')
     self.axs[-1][0].remove()
 
-    axDVW_cal = self.fig.add_axes([0.01, 0.05, 0.1, 0.05])
-    bDVW_cal = Button(axDVW_cal, 'DVW calibration')
-    bDVW_cal.on_clicked(self.DVW_calibration)
+    button_axes_pos = ( ([0.01, 0.15, 0.1, 0.05], [0.11, 0.15, 0.1, 0.05]),
+                        ([0.01, 0.10, 0.1, 0.05], [0.11, 0.10, 0.1, 0.05]),
+                        ([0.01, 0.05, 0.1, 0.05], [0.11, 0.05, 0.1, 0.05]),
+                       )
 
-    axupdate_data = self.fig.add_axes([0.01, 0.10, 0.1, 0.05])
-    bupdate_data = Button(axupdate_data, 'Update')
-    bupdate_data.on_clicked(self.update_data)
-    
-    axClear_OPB = self.fig.add_axes([0.01, 0.15, 0.1, 0.05])
-    bClear_OPB = Button(axClear_OPB, 'Clear OPB')
-    bClear_OPB.on_clicked(self.clear_OPB)
-
-    axclear_data = self.fig.add_axes([0.11, 0.10, 0.1, 0.05])
+    axclear_data = self.fig.add_axes(button_axes_pos[0][0])
     bclear_data = Button(axclear_data, 'Clear data')
     bclear_data.on_clicked(self.clear_data)
 
-    self.axsctrl = [axDVW_cal, axupdate_data, axclear_data, axClear_OPB, ]
-    self.buttons = [bDVW_cal, bupdate_data, bclear_data, bClear_OPB, ]
+    axupdate_data = self.fig.add_axes(button_axes_pos[0][1])
+    bupdate_data = Button(axupdate_data, 'Update')
+    bupdate_data.on_clicked(self.update_data)
+
+    axOPB_Scan = self.fig.add_axes(button_axes_pos[1][0])
+    bOPB_Scan = Button(axOPB_Scan, 'OPB scan')
+    bOPB_Scan.on_clicked(self.OPB_Scan)
+
+    axDVW_cal = self.fig.add_axes(button_axes_pos[1][1])
+    bDVW_cal = Button(axDVW_cal, 'DVW calibration')
+    bDVW_cal.on_clicked(self.DVW_calibration)
+
+    
+    axClear_OPB = self.fig.add_axes(button_axes_pos[2][0])
+    bClear_OPB = Button(axClear_OPB, 'Clear OPB')
+    bClear_OPB.on_clicked(self.clear_OPB)
+
+    axOPB_Cal = self.fig.add_axes(button_axes_pos[2][1])
+    bOPB_Cal = Button(axOPB_Cal, 'OPB calibration')
+    bOPB_Cal.on_clicked(self.OPB_Cal)
+
+
+    self.axsctrl = [axDVW_cal, axupdate_data, axclear_data, axClear_OPB, axOPB_Cal, axOPB_Scan]
+    self.buttons = [bDVW_cal, bupdate_data, bclear_data, bClear_OPB, bOPB_Cal, bOPB_Scan]
+
 
     self.cidweel = self.fig.canvas.mpl_connect('scroll_event', self.callback_scroll)
 
@@ -282,14 +299,7 @@ class ADC(object):
       l.set_ydata(data)
 
   def plot_ADC_Core_data(self, axs):
-    ADC_wave = self.wave.copy()
-    nof_trig, nof_samples = ADC_wave.shape
-    nof_samples = nof_samples//self.ADC_nof_cores
-    ADC_wave.shape = (nof_trig, nof_samples, self.ADC_nof_cores)
-    
-    DCs = ADC_wave.mean(axis=1).T
-    stds = ADC_wave.std(axis=1).T
-    
+    DCs, stds = self.wave_DCs_stds()
     self.line_DCs = []
     self.line_stds = []
     for DC_ax, vals in zip(axs[0], DCs):
@@ -301,13 +311,7 @@ class ADC(object):
     axs[1][0].set_ylabel('Std')
 
   def update_ADC_Core_data(self):
-    ADC_wave = self.wave.copy()
-    nof_trig, nof_samples = ADC_wave.shape
-    nof_samples = nof_samples//self.ADC_nof_cores
-    ADC_wave.shape = (nof_trig, nof_samples, self.ADC_nof_cores)
-    
-    DCs = ADC_wave.mean(axis=1).T
-    stds = ADC_wave.std(axis=1).T
+    DCs, stds =  self.wave_DCs_stds()
     
     ylims = self.axs[0][0].get_ylim()
     for line, vals in zip(self.line_DCs, DCs):
@@ -335,10 +339,137 @@ class ADC(object):
 
 
   def clear_OPB(self, event=None):
+    reset_val = 128
     for action in ('offset', 'gain', 'phase'):
       for core in self.ADC_cores:
-        self.ADC_write[action](self.fpga, self.zdok_n, core, 128)
+        self.ADC_write[action](self.fpga, self.zdok_n, core, reset_val)
+        self.ADC_OGP[action][core] = reset_val
+    if event is not None:
+      self.update_data()
+
+
+  def wave_DCs_stds(self, DCs=True, stds=True):
+    ADC_wave = self.wave.copy()
+    nof_samples = self.nof_samples // self.ADC_nof_cores
+    ADC_wave.shape = (self.nof_trig, nof_samples, self.ADC_nof_cores)
+    if DCs and not stds:
+      DCs = ADC_wave.mean(axis=1).T
+      return DCs
+    if stds and not DCs:
+      stds = ADC_wave.std(axis=1).T
+      return stds
+    if DCs and stds:
+      DCs = ADC_wave.mean(axis=1).T
+      stds = ADC_wave.std(axis=1).T
+      return DCs , stds
+
+
+  def OPB_Scan(self, event=None):
+
+    self.clear_OPB()
+
+    reg_vals = np.arange(256)
+    trials = 2
+    self.DCs_vs_reg_val = np.empty((len(reg_vals), self.ADC_nof_cores, trials), dtype=float)
+    action = 'offset'
+    for reg in reg_vals:
+      for core in self.ADC_cores:
+        self.ADC_write[action](self.fpga, self.zdok_n, core, reg)
+      self.get_snapshot(count=trials)
+      DCs = self.wave_DCs_stds(stds=False)
+      print(reg, DCs)
+      self.DCs_vs_reg_val[reg] = DCs
+    
+    for core, ax in zip(self.ADC_cores, self.axs[0]):
+      ax.cla()
+      for i in range(trials):
+        ax.plot(reg_vals, self.DCs_vs_reg_val[:, core-1, i], '.')
+
+    self.clear_OPB()
+
+    reg_vals = np.arange(256)
+    trials = 2
+    self.stds_vs_reg_val = np.empty((len(reg_vals), self.ADC_nof_cores, trials), dtype=float)
+    action = 'gain'
+    for reg in reg_vals:
+      for core in self.ADC_cores:
+        self.ADC_write[action](self.fpga, self.zdok_n, core, reg)
+      self.get_snapshot(count=trials)
+      stds = self.wave_DCs_stds(DCs=False)
+      print(reg, stds)
+      self.stds_vs_reg_val[reg] = stds
+    
+    for core, ax in zip(self.ADC_cores, self.axs[1]):
+      ax.cla()
+      for i in range(trials):
+        ax.plot(reg_vals, self.stds_vs_reg_val[:, core-1, i]**2, '.')   # plot variance in log scale
+        ax.set_yscale('log')
+    
+    self.clear_OPB()
+
+
+  def OPB_Cal(self, event=None):
+    # Automatic offset calibration (preliminary)
+    for auto_cal in range(3):   # somehow, calibration on core 4 take several itteration to converge, while 1, 2, 3 are fine on first shot... 
+      self.get_snapshot(count=10)
+      org_DCs = self.wave_DCs_stds(stds=False)
+      org_DC = np.mean(org_DCs, axis=-1)
+      print("org_DC= ", org_DC)
+      
+      action = 'offset'
+      dreg = 16
+      for core in self.ADC_cores:
+        old_reg = self.ADC_read[action](self.fpga, self.zdok_n, core)
+        new_reg = old_reg + dreg
+        self.ADC_write[action](self.fpga, self.zdok_n, core, new_reg)
+        self.ADC_OGP[action][core] = new_reg
+      
+      self.get_snapshot(count=10)
+      self.update_data()
+      new_DCs = self.wave_DCs_stds(stds=False)
+      new_DC = np.mean(new_DCs, axis=-1)
+      print("new_DC= ",new_DC)
+      
+      dDCs_over_dreg = (new_DC - org_DC) / dreg
+      print("dd= ", dDCs_over_dreg)
+      
+      for core, dd, DC in zip(self.ADC_cores, dDCs_over_dreg, new_DC):
+        corr_reg = round(self.ADC_OGP[action][core] + (0 - DC) / dd)
+        self.ADC_write[action](self.fpga, self.zdok_n, core, corr_reg)
+        self.ADC_OGP[action][core] = corr_reg
+      
+      self.update_data()
+    final_DCs = self.wave_DCs_stds(stds=False)
+    final_DC = np.mean(final_DCs, axis=-1)
+    print("final_DC= ", final_DC)
+
+
+    # END of automatic offset calibration (preliminary)
+
+    # Automatic gain calibration (preliminary)
+    # END of automatic gain calibration (preliminary)
+
+    # Phase calibration (preliminary)
+    self.get_snapshot(count=100)
+    ADC_wave=self.wave.copy()
+    ADC_wave.shape = ((self.nof_trig, -1, self.ADC_nof_cores))
+    TF = np.fft.rfft(self.window[None, :, None] * ADC_wave, axis=-2)
+    C=TF[:,:,:,None]*TF[:,:,None,:].conj()
+    C = np.mean(C, axis=0)
+    fig, axs = plt.subplots(figsize=(8, 8), #   muADC1,   muADC2,    muADC3,   muADC4
+                            nrows = 4,       #  stdADC1,  stdADC2,   stdADC3,  stdADC4
+                            ncols = 4,       #  phiADC1,  phiADC2,   phiADC3,  phiADC4
+                                             # controls,     wave, histogram, spectrum
+                            )
+    for i in (0,1,2,3):
+      for j in (0,1,2,3):
+        axs[i][j].plot(np.angle(C[:,i,j]))
+        axs[i][j].set_ylim((-np.pi, np.pi))
+    plt.show(block=False)
+    
+    print("do something!")
     self.update_data()
+    # END of phase calibration (preliminary)
 
 
   def callback_scroll(self, event):

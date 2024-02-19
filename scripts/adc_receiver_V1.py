@@ -259,7 +259,8 @@ fig, axs = plt.subplots(nrows = len(mydesign.ADCs),
                         sharex='col', sharey='col',
                         )
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
-  ADC.plot_snapshot(ADC_axs)
+  ADC.get_snapshot()
+  ADC.plot_interleaved_data(ADC_axs)
 plt.tight_layout()
 plt.show(block=False)
 
@@ -396,16 +397,19 @@ plt.show(block=False)
 
 
 for receiver in mydesign.Receivers:
-  snap_name, decimation, ymin, ymax = "dec_out", 1, 0, 10
-  #snap_name, decimation, ymin, ymax = "HBs_HB2_out", 2, -6, 2
-  #snap_name, decimation, ymin, ymax = "HBs_HB1_out", 4, -15, -6
-  #snap_name, decimation, ymin, ymax = "HBs_HB0_out", receiver.decimation, -2, 6
-  if decimation == 8:
-    ymin, ymax = -25, -15
+              # snap_name,          decimation, ymin, ymax
+  confs = ((    "dec_out",                   1,  -20,   30),
+           ("HBs_HB2_out",                   2,  -20,   30),
+           ("HBs_HB1_out",                   4,  -20,   30),
+           ("HBs_HB0_out", receiver.decimation,  -20,   30),
+           )
+  base_BW = receiver.Fe / receiver.NCO_par
+  for snap_name, decimation, ymin, ymax in confs:
+    print(snap_name, decimation, ymin, ymax)
 
   dats = []
   t0 = datetime.datetime.utcnow()
-  Nacc = 100
+    Nacc = 1000
   raw_fmt = False
   for itt in tqdm.tqdm(range(Nacc)):
     (d_w, d_dp), dat = receiver.get_snapshot(snap_name=snap_name, raw_fmt=raw_fmt, man_valid=False)
@@ -419,7 +423,9 @@ for receiver in mydesign.Receivers:
   Nacc, Nfft, _ = dats.shape
   dats.shape = (Nacc, Nfft, 2, 2)
   dats = dats[..., 0] + 1j * dats[..., 1]
+    BW = receiver.Fe / receiver.NCO_par / decimation
 
+    if False:
   fig, axs = plt.subplots(nrows=2, ncols=2,
                           sharex='row', sharey='all',
                           figsize=(10, 5))
@@ -432,7 +438,6 @@ for receiver in mydesign.Receivers:
   axs[0, 0].set_xlim(-1,1)
   axs[0, 0].set_ylim(-1,1)
   fig.suptitle(str(receiver) + "\nBW=%6.2f MHz" % (BW*1e-6))
-
     
 
   DATs = np.fft.fft(dats, axis=1)
@@ -442,13 +447,14 @@ for receiver in mydesign.Receivers:
   DAT_min = DATs.min(axis=0)
   DAT_mean = DATs.mean(axis=0)
   DAT_max = DATs.max(axis=0)
-  BW = receiver.Fe / receiver.NCO_par / decimation
   df = np.arange(-Nfft/2, Nfft/2, dtype=float)/Nfft * BW
   f = (receiver.Fc + df)
 
   fig, axs = plt.subplots(nrows=2, ncols=2,
                           sharex='all', sharey='row',
-                          figsize=(10, 10))
+                            figsize=(38.34, 10))
+
+    plt.tight_layout()
 
   spectral_lines = {"HI": (1420405751.768,),
                     "OH": (1612.231e6, 1665.402e6, 1667.359e6, 1720.530e6,),
@@ -471,7 +477,7 @@ for receiver in mydesign.Receivers:
   axs[0, 1].plot(f, 10*np.log10(DAT_mean[:,1].T),'k')
   axs[0, 1].set_ylim((ymin, ymax))
 
-  img0 = axs[1, 0].imshow(10*np.log10(DATs[:,:,0]),
+    fig.img0 = axs[1, 0].imshow(10*np.log10(DATs[:,:,0]),
                    extent=(f[0], f[-1], t0, t1),
                    aspect='auto',
                    vmin=ymin, vmax=ymax,
@@ -479,7 +485,7 @@ for receiver in mydesign.Receivers:
                    cmap='gray',
                    interpolation='nearest'
                    )
-  img1 = axs[1, 1].imshow(10*np.log10(DATs[:,:,1]),
+    fig.img1 = axs[1, 1].imshow(10*np.log10(DATs[:,:,1]),
                    extent=(f[0], f[-1], t0, t1),
                    aspect='auto',
                    vmin=ymin, vmax=ymax,
@@ -499,22 +505,20 @@ for receiver in mydesign.Receivers:
   ticks = list(ticks)
   ticks.sort()
   axs[1, 1].set_xticks(ticks)
+    axs[1, 1].set_xlim((receiver.Fc-base_BW/2, receiver.Fc+base_BW/2))
   axs[1, 0].set_xlabel('Freq (Hz)')
   axs[1, 1].set_xlabel('Freq (Hz)')
   fig.suptitle(str(receiver) + "\nBW=%6.2f MHz" % (BW*1e-6))
 
+        
   def update_clim(ax):
       f_start, P_min, BW, dP = ax.viewLim.bounds
-      img0.set_clim(vmin = P_min, vmax = P_min+dP)
-      img1.set_clim(vmin = P_min, vmax = P_min+dP)
+      ax.figure.img0.set_clim(vmin = P_min, vmax = P_min+dP)
+      ax.figure.img1.set_clim(vmin = P_min, vmax = P_min+dP)
       
   axs[0, 0].callbacks.connect('ylim_changed', update_clim)
   axs[0, 1].callbacks.connect('ylim_changed', update_clim)
-  update_clim(axs[0, 0])
-  update_clim(axs[0, 1])
-
-
-  plt.tight_layout()
+    update_clim(axs[0, 0])   # force fisrt clim computation
 
 plt.show(block=False)
 
