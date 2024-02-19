@@ -337,6 +337,15 @@ mydesign.arm_PPS()
 mydesign.monitor()
 
 
+my_hist = histogram.histogram(mydesign.fpga, basename='rcvr0_HBs_dec')
+names = ('dec_fir', 'HB2', 'HB1', 'HB0')
+for sel, name in enumerate(names):
+    mydesign.fpga.write_int('rcvr0_HBs_hist_sel', sel)
+    time.sleep(2)
+    my_hist.get_counts()
+    print(my_hist.buses)
+    my_hist.plot_counts(suptitle=name)
+
 
 # get and plot some data from mixer and dec_fir to chek data formats and overflows
 for receiver in mydesign.Receivers:

@@ -32,6 +32,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 class histogram(object):
     def __init__(self, fpga=None, basename='histogram_'):
@@ -48,7 +49,10 @@ class histogram(object):
         # Extract bus names and bit list
         buses = {}
         for d in dev:
-            _, bus_name, bit_num = d.split('_')
+            parts = d.split('_')
+            bus_name = '_'.join(parts[:-1])
+            bit_num = parts[-1]
+
             bit_num = int(bit_num.replace('b', ''))
             if bus_name in buses.keys():
                 buses[bus_name].add(bit_num)
@@ -64,19 +68,22 @@ class histogram(object):
                                'counts': np.zeros(nof_bits, dtype=np.uint64),
                                }
         self.buses = buses
+        self.buses_names = buses.keys()
+        self.buses_names.sort()
 
     def get_counts(self):
         for bus in self.buses.keys():
             for bit in range(self.buses[bus]['width']):
-                self.buses[bus]['counts'][bit] = self.fpga.read_uint(self.basename + bus + ('_b%d' % bit))
+                self.buses[bus]['counts'][bit] = self.fpga.read_uint(bus + ('_b%d' % bit))
 
-    def plot_counts(self):
+    def plot_counts(self, suptitle=None):
         self.fig, self.axs = plt.subplots(nrows=len(self.buses.keys()),
                                           ncols=1,
                                           sharey='col'
                                           )
         self.bars = []
-        for ax, bus in zip(self.axs, self.buses.keys()):
+
+        for ax, bus in zip(self.axs, self.buses_names):
             bit_num = range(self.buses[bus]['width'])
             bar = ax.bar(bit_num,
                          self.buses[bus]['counts'],
@@ -85,10 +92,12 @@ class histogram(object):
             ax.set_xticks(bit_num)
             ax.set_xticklabels(bit_num)
         ax.set_ybound(lower=1)
+        if suptitle is not None:
+            self.fig.suptitle(suptitle)
         plt.show(block=False)
 
     def update_plot(self):
-        for bar, bus in zip(self.bars, self.buses.keys()):
+        for bar, bus in zip(self.bars, self.buses_names):
             for patch, count in zip(bar.get_children(), self.buses[bus]['counts']):
                 patch.set_height(count)
         self.fig.canvas.draw() 
@@ -102,4 +111,13 @@ class histogram(object):
 #     time.sleep(1.1)
 #     my_hist.get_counts()
 #     my_hist.update_plot()
+
+# my_hist = histogram(mydesign.fpga, basename='rcvr0_HBs_dec')
+# names = ('dec_fir', 'HB2', 'HB1', 'HB0')
+# for sel, name in enumerate(names):
+#     mydesign.fpga.write_int('rcvr0_HBs_hist_sel', sel)
+#     time.sleep(2)
+#     my_hist.get_counts()
+#     print(my_hist.buses)
+#     my_hist.plot_counts(suptitle=name)
 
