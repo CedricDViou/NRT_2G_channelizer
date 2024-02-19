@@ -79,7 +79,7 @@ Fin = 130000000# Hz
 Valon = ADC_clock.ADC_clock()
 if conf_Valon:
   Valon.set_config(FA=F_valon/1e6,
-                   PA=-4,
+                   PA=5,
                    FB=Fin/1e6,
                    PB=-4,
                    )

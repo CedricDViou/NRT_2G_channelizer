@@ -51,7 +51,7 @@ ADC = imp.reload(ADC)
 
 roach2 = "192.168.40.71"
 bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_03_1855.fpg"
-conf_Valon = False
+conf_Valon = True
 ADC_cal = False
 
 #FEED, Fe = 'HF', 3200000000.0 # 1.6-3.2  GHz
@@ -63,7 +63,7 @@ Fin = 130000000# Hz
 if conf_Valon:
   Valon = ADC_clock.ADC_clock()
   Valon.set_config(FA=F_valon/1e6,
-                   PA=-4,
+                   PA=5, # -4, -1, 2, 5
                    FB=Fin/1e6,
                    PB=-4,
                    )
