@@ -103,5 +103,20 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+**/vhdl/work
+**/vhdl/vsim.wlf
+*.bak
+
 bof/*
-*bin
+*.mat
+*.bin
+*.png
+*.txt
+
+**/quartus/db
+**/quartus/incremental_db
+**/quartus/output_files
+*.qws
+*.cache
+*.pdf
+*.odp

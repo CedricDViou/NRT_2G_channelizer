@@ -1,0 +1,6 @@
+QUARTUS_VERSION = "22.1"
+DATE = "14:48:20  August 02, 2023"
+
+# Revisions
+
+PROJECT_REVISION = "HB_decimator"
