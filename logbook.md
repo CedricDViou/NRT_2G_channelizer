@@ -6,33 +6,386 @@
   - Implement OGP and INL calibrtion
     - Starting with https://github.com/nrao/adc5g_devel
     - O and G are good.
-    - P not so much
+    - P not so much, but doesn't seem to care much for noise-like data as ours...
 
 - In 8Ghzspectro.pdf, NOEMA:
-  - uses a noise diode to calibrate ADC
-    - Try that
+  - uses a noise diode to calibrate ADC -> nice: does the trick more easily than fitting a sine wave
+  - Issue with ADC calibration was low level of clock driver -> Fixed
   - Implements an overlapped PFB to get a flat RF band response
-
-- [ ] Start differentiating select in 3 versions
-
-- Black boxes
-  - [ ] nrt_bw1800_ch16_fft_core (Issue with reset values for delay counters)
-  - [ ] nrt_bw1800_2pols_ch16_8taps_pfb_core (Issue when generating IP)
-
-
+  
 - reorder firmware design files in project
 - Adapt scripts to these new locations
 
 TODO:
   - Add FPGA_ver verification in scripts
-  - Add unbiased round in fft (and pfb?) to remove DC lines
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
-  - mydesign.SEFRAM.arm() should wait for armed PPS to start
+  - Transpose channels / time (128 / 16) in pulsar mode
 
+
+
+
+## 2024/10/31
+- Testing adc_receiver_v2_2024_Oct_28_1027.fpg
+  - rcvr0 inserts an extra 64-bit word in front of packet (timing violation?  schematic copy-paste error?)
+    - Compare burster0/burster1 and TenGbE0/TenGbE1 by screenshot diffing -> no major differences noticed
+
+- ADC_receiver_V2
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -1.924ns, 254 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.439ns, 19 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.174ns, 6 failing endpoints
+      - Same violation, but between rcvr3 and rcvr1 now
+      - Try with rcvr3 in the middle
+        ```
+        AREA_GROUP "rcvr0_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y4:CLOCKREGION_X1Y4;
+        AREA_GROUP "rcvr1_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y5:CLOCKREGION_X1Y5;
+        AREA_GROUP "rcvr2_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y7:CLOCKREGION_X1Y7;
+        AREA_GROUP "rcvr3_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y6:CLOCKREGION_X1Y6;
+        ``` 
+  - Start fit from XPS only:
+    ```
+    cd XPS_ROACH2_base/
+    rm __xps/system_routed
+    export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    source $XILINX_PATH/settings64.sh
+    gmake -f system.make bits
+    ```
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.607ns, 188 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.333ns, 16 failing endpoints
+      - To be checked later
+    - xaui_clk: SOLVED!!!
+  - Test bitstream anyway for test
+    ``` 
+    cd XPS_ROACH2_base/
+    cp -f etc/bitgen.ut implementation/bitgen.ut
+    cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+    - adc_receiver_v2_2024_Oct_30_1703.fpg
+      - Still getting an extra 64-bit word in front of packet on rcvr0
+        - timing violation? (not in xaui_clk anymore)
+        - schematic copy-paste error?
+        - extra z^-1 on PPSARMReset in pipeADCs only affecting rcvr0?  Probably not.  All receivers gets the same data stream.  Just different lag.
+      - Uncomment snap blocks to spy over buses before spead packetizer and after spead packetizer (before ten_Gbe_v2)
+  - Start fit
+
+
+## 2024/10/30
+- ADC_receiver_V2
+  - Change FS switch IP and get doc to monitor status with telnet: https://confluence2.obs-nancay.fr/display/RT/Switch+FS+S5850-24S2Q
+  - Testing adc_receiver_v2_2024_Oct_28_1027.fpg
+    - Hard to reset 10G after firmware upload
+    - rcvr0 inserts an extra 64-bit word in front of packet (timing violation?  schematic copy-paste error?)
+  - Timing violations are slightly worse now -> planAhead
+    - adc_receiver_v2_adc0_asiaa_adc5g: -1.055ns, 272 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.269ns, 16 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.267ns, 23 failing endpoints
+      - Swap rcvr0 and rcvr1 area_group
+  - Start fit
+
+
+## 2024/10/29
+- ADC_receiver_V2
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.210ns, 145 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.028ns, 10 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.372ns, 29 failing endpoints
+      - Forcing "*_TenGbE0_ten_Gbe_v2/*" to CLOCKREGION_X1Y5, with "*_TenGbE1_ten_Gbe_v2/*" was probably a bad idea because of congested area.
+      - Try shifting all groups one clock region higher
+        ```
+        AREA_GROUP "rcvr0_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y4:CLOCKREGION_X1Y4;
+        AREA_GROUP "rcvr1_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y5:CLOCKREGION_X1Y5;
+        AREA_GROUP "rcvr2_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y6:CLOCKREGION_X1Y6;
+        AREA_GROUP "rcvr3_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y7:CLOCKREGION_X1Y7;
+        ```
+        is now
+        ```   
+        AREA_GROUP "rcvr0_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y5:CLOCKREGION_X1Y5;
+        AREA_GROUP "rcvr1_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y6:CLOCKREGION_X1Y6;
+        AREA_GROUP "rcvr2_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y7:CLOCKREGION_X1Y7;
+        AREA_GROUP "rcvr3_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y8:CLOCKREGION_X1Y8;
+        ```
+  - Start fit
+
+
+## 2024/10/28
+- ADC_receiver_V2
+  - Timing violations -> PlanAhead
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.397ns, 175 failing endpoints
+      - Much better. To be checked later
+    - epb_clk_in: -1.313ns, 14 failing endpoints
+      - To be checked later
+    - xaui_clk: -3.229ns, 241 failing endpoints
+      - Force "*_TenGbE[0-3]_ten_Gbe_v2/*" to CLOCKREGION_X1Y[4-7]
+  - Start fit
+  - Timing violations -> PlanAhead
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.294ns, 119 failing endpoints
+      - Replace adc_receiver_v2/rcvr?/HBs/delays using SRL16 by regs
+    - epb_clk_in: -1.068ns, 13 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.135ns, 5 failing endpoints
+      - Force "*_TenGbE0_ten_Gbe_v2/*" to CLOCKREGION_X1Y5, with "*_TenGbE1_ten_Gbe_v2/*"
+  - Generate bitstream anyway, for test:
+    ```bash
+    $ cd ..../adc_receiver_v2/XPS_ROACH2_base
+    $ export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    $ source $XILINX_PATH/settings64.sh
+    $ cp -f etc/bitgen.ut implementation/bitgen.ut
+    $ cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+  - Start fit
+  - Timing violations
+    - Worse on adc_receiver_v2_adc0_asiaa_adc5g
+    - Revert : force "*_TenGbE0_ten_Gbe_v2/*" to CLOCKREGION_X1Y5, with "*_TenGbE1_ten_Gbe_v2/*"
+  - Start fit
+  - Network
+    - Connect 2x 10G from Renard (192.168.5.190 + 192.168.5.191) on 10/40G S5850 switch
+
+
+## 2024/10/26
+- ADC_receiver_V2
+  - Change constraint OPB_grp from CLOCKREGION_X0Y4:CLOCKREGION_X1Y4 to SLICE_X20Y0:SLICE_X27Y359
+  - Timing violations -> PlanAhead
+    - -1.076 ns for adc0_asiaa_adc5g clock, 318 failing endpoints
+      - Add registers in pulse_ext and after edge_detect.  Expected to fix -1 ns violations
+      - Violations (< 0.8 ns) in receiver signal processing.  To be checked later
+    - -1.136 ns for TS_epb_clk_in, 35 failing endpoints
+      - Violation on TS_epb_clk_in from L0 memories are gone.  Some are left near reset registers.  To be checked later
+    - -3.22 ns for xaui_clk, 257 failing endpoints
+      - Still getting not understandable violation on xaui_clk between TenGbE3_ten_Gbe_v2/tge_tx_inst/ip_length and TenGbE0_ten_Gbe_v2/tge_tx_inst/ip_checksum.
+  - Start fit
+
+
+## 2024/10/24-25
+- ADC_receiver_V2
+  - Add delay in adc_receiver_v2/TenGbE?/led_out_drv/1/10
+  - Timing violations
+    - -0.87 ns for adc0_asiaa_adc5g clock
+    - -2.06 ns for TS_epb_clk_in
+    - -3.39 ns for xaui_clk
+  - PlanAhead
+
+
+## 2024/10/08
+- pulsar_mode_v1 + Carri
+  - Record 2 pcap files:
+    - ens7f0np0_2024-10-14T08:24:04+0000.pcap
+    - ens7f1np1_2024-10-14T08:24:40+0000.pcap
+  - Headers contain (ignore conf: used for spectrometer):
+    ```
+    {'heap_id': 245786929,  'Fe': 3700000000,   'conf': {'nof_chan': 5, 'smpl_per_frm': 6, 'chans': [0, 0, 0, 0, 0]}}
+    {'heap_id': 245786930,  'Fe': 3700000000,   'conf': {'nof_chan': 5, 'smpl_per_frm': 6, 'chans': [0, 0, 0, 0, 0]}}
+    {'heap_id': 245786931,  'Fe': 3700000000,   'conf': {'nof_chan': 5, 'smpl_per_frm': 6, 'chans': [0, 0, 0, 0, 0]}}
+    ```
+  - Use NRT_2G_spectrometer/BHR_NRT/read_pulsar_pcap.py to generate 8 1/8 of the BF feed of NRT.
+    - ![alt text](20241014_pulsar_mode_0-1850MHz.png)
+  - Some DC lines (low ADC inputs?)
+    - ![alt text](20241014_zoom_bande4.png) ![alt text](20241014_ADC_inputs.png)
+  - Lots of data losses:
+    - ![](20241014_head_id_lost.png)
+    - Black: Captured packets, color: 16 congituous packets for a 256-fft, White: lost
+
+
+## 2024/10/08
+- Carri
+  - Test and label each 10G links
+    - All fine
+  - Issue was not UDP flowding, but the packet themselves that used ff:ff:ff:ff:ff:ff as Dst_MAC (ROACH2 MAC tables default settings).
+    - Fixed by filing in MAC table of each 10G interfaces 
+      ```
+      macs = [0x00ffffffffffff, ] * 256
+      macs[180] = 0x9c63c0f82f6e
+      macs[181] = 0x9c63c0f82f6e
+      macs[182] = 0x9c63c0f82f6e
+      macs[183] = 0x9c63c0f82f6e
+      macs[184] = 0x9c63c0f82f6f
+      macs[185] = 0x9c63c0f82f6f
+      macs[186] = 0x9c63c0f82f6f
+      macs[187] = 0x9c63c0f82f6f
+      
+      #gbe.set_arp_table(macs) # will fail
+      macs_pack = struct.pack('>%dQ' % (len(macs)), *macs)
+      for gbe in self.fpga.gbes:
+          self.fpga.blindwrite(gbe.name, macs_pack, offset=0x3000)
+      ```
+
+      ``` bash
+      $ bmon -p 'ens7f*'
+      Interfaces                     │ RX bps       pps     %│ TX bps       pps     %
+       >ens7f0np0                    │   3.48GiB 450.81K     │    107B        1
+        ens7f1np1                    │   3.48GiB 450.90K     │      0         0
+      ───────────────────────────────┴───────────────────────┴──────────────────────────────────────────────────────      ───────────────────────────────────────────────────────────────────────────────────────
+           GiB                      (RX Bytes/second)                                                                B                      (TX Bytes/second)
+          3.48 ||||||......................................................                               120.      00 |.|.|.......................................................
+          2.90 ||||||......................................................                               100.      00 |.|.|.......................................................
+          2.32 ||||||......................................................                                80.      00 |.|.|.......................................................
+          1.74 ||||||......................................................                                60.      00 ||||||......................................................
+          1.16 ||||||......................................................                                40.      00 ||||||......................................................
+          0.58 ||||||......................................................                                20.      00 ||||||......................................................
+               1   5   10   15   20   25   30   35   40   45   50   55   60                                            1   5   10   15   20   25   30   35   40   45   50   55   60
+      ```
+
+      ``` bash
+      $ sudo tcpdump -i ens7f0np0 -en
+      12:42:43.758625 12:34:56:78:00:02 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.22.10002 > 192.168.5.182.10005: UDP, length 8256
+      12:42:43.758625 12:34:56:78:00:03 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.23.10003 > 192.168.5.183.10002: UDP, length 8256
+      12:42:43.758625 12:34:56:78:00:00 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.20.10000 > 192.168.5.180.10002: UDP, length 8256
+      12:42:43.758625 12:34:56:78:00:01 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.21.10001 > 192.168.5.181.10004: UDP, length 8256
+
+      $ sudo tcpdump -i ens7f1np1 -en
+      12:43:41.463232 12:34:56:78:00:06 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.26.10006 > 192.168.5.185.10001: UDP, length 8256
+      12:43:41.463238 12:34:56:78:00:04 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.24.10004 > 192.168.5.184.10002: UDP, length 8256
+      12:43:41.463240 12:34:56:78:00:05 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.25.10005 > 192.168.5.187.10002: UDP, length 8256
+      12:43:41.463244 12:34:56:78:00:07 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.27.10007 > 192.168.5.186.10003: UDP, length 8256
+      ```
+  - Tests that all 8 IPs configured on top of the 2 NICs interfaces can be listened to properly
+    ``` bash
+    (myPy3.12) user@highserver-xlr4a:~/socket_over_8_IP_over_2_NICs$ ./monitor_BHR_over_8_IPs.py
+    ('192.168.5.25', 10005)  ->  ('192.168.5.187', 10000)
+    ('192.168.5.20', 10000)  ->  ('192.168.5.180', 10000)
+    ('192.168.5.21', 10001)  ->  ('192.168.5.181', 10000)
+    ('192.168.5.22', 10002)  ->  ('192.168.5.182', 10000)
+    ('192.168.5.23', 10003)  ->  ('192.168.5.183', 10000)
+    ('192.168.5.24', 10004)  ->  ('192.168.5.184', 10000)
+    ('192.168.5.26', 10006)  ->  ('192.168.5.185', 10000)
+    ('192.168.5.27', 10007)  ->  ('192.168.5.186', 10000)
+    ('192.168.5.25', 10005)  ->  ('192.168.5.187', 10000)
+    ('192.168.5.20', 10000)  ->  ('192.168.5.180', 10000)
+    ('192.168.5.21', 10001)  ->  ('192.168.5.181', 10000)
+    ```
+
+
+## 2024/10/07
+- CARRI
+  - IC: Reboot serveur and install Mellanox ODEF
+  - CDV/ configure IPs
+    ```
+       ens7f0np0:
+            addresses: [ 192.168.5.180/24, 192.168.5.181/24, 192.168.5.182/24, 192.168.5.183/24 ]
+            mtu: 9000
+        ens7f1np1:
+            addresses: [ 192.168.5.184/24, 192.168.5.185/24, 192.168.5.186/24, 192.168.5.187/24 ]
+            mtu: 9000
+    ```
+  - Getting some data
+    ``` bash
+    $ sudo tcpdump -i ens7f1np1 -nn
+    07:30:08.070900 IP 192.168.5.27.10007 > 192.168.5.186.10000: UDP, length 8256
+    07:30:08.070908 IP 192.168.5.20.10000 > 192.168.5.180.10001: UDP, length 8256
+    ```
+
+    ``` bash
+    $ bmon -p 'ens7f*'
+    Interfaces                     │ RX bps       pps     %│ TX bps           pps     %
+      ens7f0np0                    │   1.74GiB 225.38K     │ 0         0
+      ens7f1np1                    │   1.74GiB 225.38K     │ 0         0
+    ───────────────────────────────┴───────────────────────┴─────────────────────    ─────────────────────────────────────────────────────────────────────────────    ──
+         GiB                      (RX Bytes/second) (TX Bytes/second)
+        1.74 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        1.45 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        1.16 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        0.87 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        0.58 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        0.29 ||||||||||||||||||.......................................... 0.    00 ............................................................
+             1   5   10   15   20   25   30   35   40   45   50 55       60                  1   5   10   15   20   25   30   35 40   45       50   55   60
+    
+    ```
+  - CDV: Configure monitoring interface on S5850
+    - Not much useful for our application
+  - Expected data flow for pulsar_test_10g_v1.1.py:
+    - Fe = 3.7GSps
+    - FPGA Fsys = 231.25 MHz
+    - duty cycle = 50%
+    - 112915 pck/s, pck size = 1024 float64 + 8 int64 for header
+    - 8256 B/pkt
+    - 932 MB/s / 10G
+    - 7.458 GB/S
+  - But only getting 50% of it
+  - Lots of data sent back to ROACH2 (UDP_floading?)
+  - With only 1 10G connected on switch, the 2 40G NIC see 892 MiB/s (112 k pkt/s)
+  - Add VLAN to separate the 2 40G.
+  - With only 1 10G connected on switch, the ens7f0np0 40G NIC see 892 MiB/s (112 k pkt/s). OK. The other one sees nothing
+  - With 2 10G connected on switch, the ens7f0np0 40G NIC see 1.74 GiB/s (228 k pkt/s). OK.  The other one sees nothing.
+  - With 3 10G connected on switch, the ens7f0np0 40G NIC see 2.61 GiB/s (338 k pkt/s). A bit too low...  Dropped packets?  The other one sees nothing.
+  - With 4 10G connected on switch, the ens7f0np0 40G NIC still see 2.61 GiB/s (338 k pkt/s). Very low...  Dropped packets?   The other one sees nothing.
+  - With 2 x 4 10G connected on switch, both 40G NIC see 1.74 GiB/s (228 k pkt/s).  
+
+
+
+## 2024/10/04
+- CARRI
+  - Install 10/40G switch S5850-24S2Q  (https://www.fs.com/fr/products/122280.html)
+  - Connect 8 10G transceivers on ROACH2 to fiber panel to "Labo Hors-Champ"
+  - Connect 8 10G transceivers on S5850 to fiber panel to "Chariot"
+  - Connect 2 40G DAC between S5850 and CARRI server
+  - Test pulsar_test_10g_v1.1.py
+    - Trafic but server 40G NIC is not seen by system
+
+
+## 2024/09/04
+- ADC_receiver_V2
+  - Generate bitstream anyway, for test:
+    ```bash
+    $ cd ..../adc_receiver_v2/XPS_ROACH2_base
+    $ export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    $ source $XILINX_PATH/settings64.sh
+    $ cp -f etc/bitgen.ut implementation/bitgen.ut
+    $ cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+
+
+## 2024/09/04
+- ADC_receiver_V2
+  - Much better timing violations
+    - -0.430ns for adc0_asiaa_adc5g clock
+    - -1.4 ns for TS_epb_clk_in
+  - PlanAhead
+
+
+## 2024/09/03
+- ADC_receiver_V2
+  - Change pipeADC structure (Add pairs of not gates to force synthesiser to keep register fanout tree)
+  - Fit
+
+
+## 2024/08/20
+- ADC_receiver_V2
+  - Much better worst slacks (-1.264 in data_path, -2.5 in epb)
+  - Open with PlanAhead for analysis
+
+
+## 2024/08/12
+- ADC_receiver_V2
+  - Strange timing error in pipeADCs.
+    - Move ADCsnap to the end of the chain to prevent SLR16 to be in // of regs
+  - Start fit
+
+
+## 2024/08/07
+- ADC_receiver_V2
+  - Fit failed (congestionned areas)
+    - Move INST "*/rcvr[0123]_*" to the top
+  - Start fit
+  - Fit failed (routing) and the Java crashed (/home 100%...).  Restart everything and fit again.
+  
+
+## 2024/08/06
+- ADC_receiver_V2
+  - Change shift reg that feed channels
+  - Fixed INST "*/rcvr0_*/" to INST "*/rcvr0_*" because it matched nothing
+    - But log during compile say that it overrides previous loc constraints, so we may want to put this general loc constraint atop and then be more specific with finer grain constraints.
 
 
 ## 2024/06/24 ... 2024/07/12
 - Lost logbook...
+
 
 ## 2024/06/23
 - ADC_receiver_V2
