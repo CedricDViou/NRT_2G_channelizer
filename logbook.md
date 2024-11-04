@@ -24,6 +24,22 @@ TODO:
 
 
 
+
+## 2024/11/04
+- Testing adc_receiver_v2_2024_Oct_31_1637.fpg
+  - Look into rcvr0/snaps
+    - SPEAD out from rcvr0 and rcvr1 are the same.
+    - Issue is in ten_Gbe_v2 modules or instanciations
+    - Copy/paste TenGbE1 to replace TenGbE0
+    - Other lead would be to use 10G [2345] instead of [0123]
+    - Start fit
+
+
+## 2024/11/02
+- Testing adc_receiver_v2_2024_Oct_31_1637.fpg
+  - Same issue with rcvr0.  1, 2, 3 are fine.
+
+
 ## 2024/10/31
 - Testing adc_receiver_v2_2024_Oct_28_1027.fpg
   - rcvr0 inserts an extra 64-bit word in front of packet (timing violation?  schematic copy-paste error?)
@@ -71,6 +87,10 @@ TODO:
         - extra z^-1 on PPSARMReset in pipeADCs only affecting rcvr0?  Probably not.  All receivers gets the same data stream.  Just different lag.
       - Uncomment snap blocks to spy over buses before spead packetizer and after spead packetizer (before ten_Gbe_v2)
   - Start fit
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g:  failing endpoints
+    - epb_clk_in:  failing endpoints
+  - generate bitstream anyway for test
 
 
 ## 2024/10/30
