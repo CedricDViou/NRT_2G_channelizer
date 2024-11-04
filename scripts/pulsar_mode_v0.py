@@ -53,7 +53,6 @@ channelizer = imp.reload(channelizer)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/pulsar_mode_v0/bit_files/pulsar_mode_v0_2023_Jan_16_1348.fpg"
 bitstream = "../bof/pulsar_mode_v0/bit_files/pulsar_mode_v0_2023_Feb_02_1350.fpg"
 
 conf_Valon = True
@@ -171,6 +170,70 @@ class NRT_pulsar(object):
     self.SEFRAM.disable()
 
 
+    # Configure 10G network
+    # stop everything before configuration
+    self.fpga.write_int('TenGbE_rst', 0xff)
+
+    # round robin over 8 different ports
+    TenGbE_ports = (10000,
+                    10000,
+                    10000,
+                    10000,
+                    10000,
+                    10000,
+                    10000,
+                    10000,
+                    )
+    for reg, port in enumerate(TenGbE_ports):
+        self.fpga.write_int('TGbEs_dst_port_cfg' , port)
+        self.fpga.write_int('TGbEs_dst_port_wr'  , 1<<reg)
+        self.fpga.write_int('TGbEs_dst_port_wr'  , 0)
+        
+
+    # fixed IP
+    self.fpga.write_int('TGbE_dst_ip0'   , 0xc0a805b4, blindwrite=True)   # 192.168.5.180
+    self.fpga.write_int('TGbE_dst_ip1'   , 0xc0a805b5, blindwrite=True)   # 192.168.5.181
+    self.fpga.write_int('TGbE_dst_ip2'   , 0xc0a805b6, blindwrite=True)   # 192.168.5.182
+    self.fpga.write_int('TGbE_dst_ip3'   , 0xc0a805b7, blindwrite=True)   # 192.168.5.183
+    self.fpga.write_int('TGbE_dst_ip4'   , 0xc0a805b8, blindwrite=True)   # 192.168.5.184
+    self.fpga.write_int('TGbE_dst_ip6'   , 0xc0a805b9, blindwrite=True)   # 192.168.5.185
+    self.fpga.write_int('TGbE_dst_ip7'   , 0xc0a805ba, blindwrite=True)   # 192.168.5.186
+    self.fpga.write_int('TGbE_dst_ip5'   , 0xc0a805bb, blindwrite=True)   # 192.168.5.187
+
+
+    # MAC table
+    #192.168.5.180-183  9c63c0f82f6e
+    #192.168.5.184-187  9c63c0f82f6f
+    
+    macs = [0x00ffffffffffff, ] * 256
+    macs[180] = 0x9c63c0f82f6e
+    macs[181] = 0x9c63c0f82f6e
+    macs[182] = 0x9c63c0f82f6e
+    macs[183] = 0x9c63c0f82f6e
+    macs[184] = 0x9c63c0f82f6f
+    macs[185] = 0x9c63c0f82f6f
+    macs[186] = 0x9c63c0f82f6f
+    macs[187] = 0x9c63c0f82f6f
+    
+    #gbe.set_arp_table(macs) # will fail
+    macs_pack = struct.pack('>%dQ' % (len(macs)), *macs)
+    for gbe in self.fpga.gbes:
+        self.fpga.blindwrite(gbe.name, macs_pack, offset=0x3000)
+    
+    #for gbe in self.fpga.gbes:
+    #    print(gbe.get_arp_details()[170:190])
+
+    pkt_len=1024  # as 64-bit words, as 8-byte words
+    #                                                       # header 1 : hdr_head_id: packet counter generated in HW
+    self.fpga.write_int('hdr_ADC_Freq',  int(self.Fe/1e6))  # header 2
+    self.fpga.write_int('hdr_heap_offset', 0xcc03)          # header 3
+    self.fpga.write_int('hdr_len_w',       pkt_len)         # header 4 : MUST be packet payload len
+    self.fpga.write_int('hdr5',            0xcc05)          # header 5
+    self.fpga.write_int('hdr6',            0xcc06)          # header 6
+    self.fpga.write_int('hdr7_free',       0xcc07)          # header 7
+
+
+
   def cnt_rst(self):
     self.fpga.write_int('cnt_rst', 1)
     self.fpga.write_int('cnt_rst', 0)
@@ -244,54 +307,28 @@ if ADC_DVW_cal:
   print('Done')
 
 
+
+Nfft = 4096
+nof_lanes = 8
+mydesign.feed = FEED
+
+
 if False:
   [ ADC.get_snapshot(count=100) for ADC in mydesign.ADCs ]
   [ ADC.dump_snapshot() for ADC in mydesign.ADCs ]
 
 
-
-Nfft = 4096
-
-[ ADC.get_snapshot() for ADC in mydesign.ADCs ]
 fig, axs = plt.subplots(nrows = len(mydesign.ADCs), 
                         ncols = 3,
                         sharex='col', sharey='col',
                         )
-
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
-  ADC_wave = ADC.wave.copy()
-
-  Nech_to_plot = 16384
-  ADC_axs[0].plot(np.arange(Nech_to_plot) / Fe * 1e6,
-                  ADC_wave[:Nech_to_plot],
-                  label=ADC.name)
-
-  cnt, bins, _ = ADC_axs[1].hist(ADC.wave, bins=np.arange(-128, 129) - 0.5)
-
-  nof_samples = len(ADC_wave)
-  f = np.arange(Nfft/2+1, dtype='float') / Nfft * Fe /1e6 
-  w = np.blackman(Nfft)
-  ADC_wave.shape = ((-1, Nfft))
-  DATA = np.fft.rfft(w * ADC_wave, axis=-1)
-  DATA = DATA.real**2 + DATA.imag**2
-  DATA = DATA.mean(axis=0)
-  ADC_axs[2].plot(f,
-                  10*np.log10(DATA),
-                  label=ADC.name)
-
-ADC_axs[0].set_xlabel(u"Time (us)")
-ADC_axs[0].set_xlim((0, (Nech_to_plot-1) / Fe * 1e6))
-ADC_axs[1].set_xlabel("ADC code")
-ADC_axs[1].set_xlim(bins[[0, -1]])
-ADC_axs[2].set_xlabel("Frequency (MHz)")
-ADC_axs[2].set_xlim((0, f[-1]))
-
-[ ADC_axs[0].set_ylabel("ADC code\nin [-128, 128[") for ADC_axs in axs ]
-[ ADC_axs[1].set_ylabel("Counts") for ADC_axs in axs ]
-[ ADC_axs[2].set_ylabel("Power (dB)") for ADC_axs in axs ]
-
+  ADC.get_snapshot()
+  ADC.plot_interleaved_data(ADC_axs)
 plt.tight_layout()
 plt.show(block=False)
+
+
 
 if True:
   print('SEFRAM Configuration')
