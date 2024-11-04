@@ -32,7 +32,13 @@ TODO:
     - Issue is in ten_Gbe_v2 modules or instanciations
     - Copy/paste TenGbE1 to replace TenGbE0
     - Other lead would be to use 10G [2345] instead of [0123]
-    - Start fit
+  - Start fit
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.099ns, 47 failing endpoints
+    - epb_clk_in: -1.359ns, 16 failing endpoints
+  - Generate bitstream anyway for test
+  - Same issue with rcvr0.  1, 2, 3 are fine.
+  - PlanAhead
 
 
 ## 2024/11/02
@@ -74,7 +80,7 @@ TODO:
     - epb_clk_in: -1.333ns, 16 failing endpoints
       - To be checked later
     - xaui_clk: SOLVED!!!
-  - Test bitstream anyway for test
+  - Generate bitstream anyway for test
     ``` 
     cd XPS_ROACH2_base/
     cp -f etc/bitgen.ut implementation/bitgen.ut
