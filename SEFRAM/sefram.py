@@ -54,12 +54,13 @@ dt_header = np.dtype({'names':   ['MAGIC',
                       })
 
 dt_packet = np.dtype([('HEADER' , dt_header),
-                       ('PAYLOAD', np.int64, (64, 4,)),
+                       ('PAYLOAD', np.int64, (128, 4,)),
                        ])
+dt_packet = dt_packet.newbyteorder('>')
 
 
 nof_chunks = 16
-nof_chans_per_chunk = 64
+nof_chans_per_chunk = 128
 nof_chans = nof_chunks * nof_chans_per_chunk
 
 def open_sefram(fname, nof_spec=None):

@@ -6,28 +6,1004 @@
   - Implement OGP and INL calibrtion
     - Starting with https://github.com/nrao/adc5g_devel
     - O and G are good.
-    - P not so much
+    - P not so much, but doesn't seem to care much for noise-like data as ours...
 
 - In 8Ghzspectro.pdf, NOEMA:
-  - uses a noise diode to calibrate ADC
-    - Try that
+  - uses a noise diode to calibrate ADC -> nice: does the trick more easily than fitting a sine wave
+  - Issue with ADC calibration was low level of clock driver -> Fixed
   - Implements an overlapped PFB to get a flat RF band response
-
-- [ ] Start differentiating select in 3 versions
-
-- Black boxes
-  - [ ] nrt_bw1800_ch16_fft_core (Issue with reset values for delay counters)
-  - [ ] nrt_bw1800_2pols_ch16_8taps_pfb_core (Issue when generating IP)
-
-
+  
 - reorder firmware design files in project
 - Adapt scripts to these new locations
 
 TODO:
-  - Add FPGA_ver verifivation in scripts
-  - Add unbiased round in fft (and pfb?) to remove DC lines
+  - Add FPGA_ver verification in scripts
   - TGbE_dst_addr from pulsar_mode_v0 can hold 8 destination ports, but needs to cycle through all of them.  Implement a mecanism to reset counter when last configured one is reached (when port=0 ? or 0xFF ?).
-  - Need to improve fft area_group to make easier fits
+  - Transpose channels / time (128 / 16) in pulsar mode
+
+
+
+
+
+## 2024/11/04
+- Testing adc_receiver_v2_2024_Oct_31_1637.fpg
+  - Look into rcvr0/snaps
+    - SPEAD out from rcvr0 and rcvr1 are the same.
+    - Issue is in ten_Gbe_v2 modules or instanciations
+    - Copy/paste TenGbE1 to replace TenGbE0
+    - Other lead would be to use 10G [2345] instead of [0123]
+    - Start fit
+
+
+## 2024/11/02
+- Testing adc_receiver_v2_2024_Oct_31_1637.fpg
+  - Same issue with rcvr0.  1, 2, 3 are fine.
+
+
+## 2024/10/31
+- Testing adc_receiver_v2_2024_Oct_28_1027.fpg
+  - rcvr0 inserts an extra 64-bit word in front of packet (timing violation?  schematic copy-paste error?)
+    - Compare burster0/burster1 and TenGbE0/TenGbE1 by screenshot diffing -> no major differences noticed
+
+- ADC_receiver_V2
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -1.924ns, 254 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.439ns, 19 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.174ns, 6 failing endpoints
+      - Same violation, but between rcvr3 and rcvr1 now
+      - Try with rcvr3 in the middle
+        ```
+        AREA_GROUP "rcvr0_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y4:CLOCKREGION_X1Y4;
+        AREA_GROUP "rcvr1_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y5:CLOCKREGION_X1Y5;
+        AREA_GROUP "rcvr2_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y7:CLOCKREGION_X1Y7;
+        AREA_GROUP "rcvr3_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y6:CLOCKREGION_X1Y6;
+        ``` 
+  - Start fit from XPS only:
+    ```
+    cd XPS_ROACH2_base/
+    rm __xps/system_routed
+    export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    source $XILINX_PATH/settings64.sh
+    gmake -f system.make bits
+    ```
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.607ns, 188 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.333ns, 16 failing endpoints
+      - To be checked later
+    - xaui_clk: SOLVED!!!
+  - Test bitstream anyway for test
+    ``` 
+    cd XPS_ROACH2_base/
+    cp -f etc/bitgen.ut implementation/bitgen.ut
+    cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+    - adc_receiver_v2_2024_Oct_30_1703.fpg
+      - Still getting an extra 64-bit word in front of packet on rcvr0
+        - timing violation? (not in xaui_clk anymore)
+        - schematic copy-paste error?
+        - extra z^-1 on PPSARMReset in pipeADCs only affecting rcvr0?  Probably not.  All receivers gets the same data stream.  Just different lag.
+      - Uncomment snap blocks to spy over buses before spead packetizer and after spead packetizer (before ten_Gbe_v2)
+  - Start fit
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g:  failing endpoints
+    - epb_clk_in:  failing endpoints
+  - generate bitstream anyway for test
+
+
+## 2024/10/30
+- ADC_receiver_V2
+  - Change FS switch IP and get doc to monitor status with telnet: https://confluence2.obs-nancay.fr/display/RT/Switch+FS+S5850-24S2Q
+  - Testing adc_receiver_v2_2024_Oct_28_1027.fpg
+    - Hard to reset 10G after firmware upload
+    - rcvr0 inserts an extra 64-bit word in front of packet (timing violation?  schematic copy-paste error?)
+  - Timing violations are slightly worse now -> planAhead
+    - adc_receiver_v2_adc0_asiaa_adc5g: -1.055ns, 272 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.269ns, 16 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.267ns, 23 failing endpoints
+      - Swap rcvr0 and rcvr1 area_group
+  - Start fit
+
+
+## 2024/10/29
+- ADC_receiver_V2
+  - Timing violations
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.210ns, 145 failing endpoints
+      - To be checked later
+    - epb_clk_in: -1.028ns, 10 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.372ns, 29 failing endpoints
+      - Forcing "*_TenGbE0_ten_Gbe_v2/*" to CLOCKREGION_X1Y5, with "*_TenGbE1_ten_Gbe_v2/*" was probably a bad idea because of congested area.
+      - Try shifting all groups one clock region higher
+        ```
+        AREA_GROUP "rcvr0_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y4:CLOCKREGION_X1Y4;
+        AREA_GROUP "rcvr1_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y5:CLOCKREGION_X1Y5;
+        AREA_GROUP "rcvr2_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y6:CLOCKREGION_X1Y6;
+        AREA_GROUP "rcvr3_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y7:CLOCKREGION_X1Y7;
+        ```
+        is now
+        ```   
+        AREA_GROUP "rcvr0_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y5:CLOCKREGION_X1Y5;
+        AREA_GROUP "rcvr1_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y6:CLOCKREGION_X1Y6;
+        AREA_GROUP "rcvr2_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y7:CLOCKREGION_X1Y7;
+        AREA_GROUP "rcvr3_ten_Gbe_grp"        RANGE=CLOCKREGION_X1Y8:CLOCKREGION_X1Y8;
+        ```
+  - Start fit
+
+
+## 2024/10/28
+- ADC_receiver_V2
+  - Timing violations -> PlanAhead
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.397ns, 175 failing endpoints
+      - Much better. To be checked later
+    - epb_clk_in: -1.313ns, 14 failing endpoints
+      - To be checked later
+    - xaui_clk: -3.229ns, 241 failing endpoints
+      - Force "*_TenGbE[0-3]_ten_Gbe_v2/*" to CLOCKREGION_X1Y[4-7]
+  - Start fit
+  - Timing violations -> PlanAhead
+    - adc_receiver_v2_adc0_asiaa_adc5g: -0.294ns, 119 failing endpoints
+      - Replace adc_receiver_v2/rcvr?/HBs/delays using SRL16 by regs
+    - epb_clk_in: -1.068ns, 13 failing endpoints
+      - To be checked later
+    - xaui_clk: -0.135ns, 5 failing endpoints
+      - Force "*_TenGbE0_ten_Gbe_v2/*" to CLOCKREGION_X1Y5, with "*_TenGbE1_ten_Gbe_v2/*"
+  - Generate bitstream anyway, for test:
+    ```bash
+    $ cd ..../adc_receiver_v2/XPS_ROACH2_base
+    $ export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    $ source $XILINX_PATH/settings64.sh
+    $ cp -f etc/bitgen.ut implementation/bitgen.ut
+    $ cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+  - Start fit
+  - Timing violations
+    - Worse on adc_receiver_v2_adc0_asiaa_adc5g
+    - Revert : force "*_TenGbE0_ten_Gbe_v2/*" to CLOCKREGION_X1Y5, with "*_TenGbE1_ten_Gbe_v2/*"
+  - Start fit
+  - Network
+    - Connect 2x 10G from Renard (192.168.5.190 + 192.168.5.191) on 10/40G S5850 switch
+
+
+## 2024/10/26
+- ADC_receiver_V2
+  - Change constraint OPB_grp from CLOCKREGION_X0Y4:CLOCKREGION_X1Y4 to SLICE_X20Y0:SLICE_X27Y359
+  - Timing violations -> PlanAhead
+    - -1.076 ns for adc0_asiaa_adc5g clock, 318 failing endpoints
+      - Add registers in pulse_ext and after edge_detect.  Expected to fix -1 ns violations
+      - Violations (< 0.8 ns) in receiver signal processing.  To be checked later
+    - -1.136 ns for TS_epb_clk_in, 35 failing endpoints
+      - Violation on TS_epb_clk_in from L0 memories are gone.  Some are left near reset registers.  To be checked later
+    - -3.22 ns for xaui_clk, 257 failing endpoints
+      - Still getting not understandable violation on xaui_clk between TenGbE3_ten_Gbe_v2/tge_tx_inst/ip_length and TenGbE0_ten_Gbe_v2/tge_tx_inst/ip_checksum.
+  - Start fit
+
+
+## 2024/10/24-25
+- ADC_receiver_V2
+  - Add delay in adc_receiver_v2/TenGbE?/led_out_drv/1/10
+  - Timing violations
+    - -0.87 ns for adc0_asiaa_adc5g clock
+    - -2.06 ns for TS_epb_clk_in
+    - -3.39 ns for xaui_clk
+  - PlanAhead
+
+
+## 2024/10/08
+- pulsar_mode_v1 + Carri
+  - Record 2 pcap files:
+    - ens7f0np0_2024-10-14T08:24:04+0000.pcap
+    - ens7f1np1_2024-10-14T08:24:40+0000.pcap
+  - Headers contain (ignore conf: used for spectrometer):
+    ```
+    {'heap_id': 245786929,  'Fe': 3700000000,   'conf': {'nof_chan': 5, 'smpl_per_frm': 6, 'chans': [0, 0, 0, 0, 0]}}
+    {'heap_id': 245786930,  'Fe': 3700000000,   'conf': {'nof_chan': 5, 'smpl_per_frm': 6, 'chans': [0, 0, 0, 0, 0]}}
+    {'heap_id': 245786931,  'Fe': 3700000000,   'conf': {'nof_chan': 5, 'smpl_per_frm': 6, 'chans': [0, 0, 0, 0, 0]}}
+    ```
+  - Use NRT_2G_spectrometer/BHR_NRT/read_pulsar_pcap.py to generate 8 1/8 of the BF feed of NRT.
+    - ![alt text](20241014_pulsar_mode_0-1850MHz.png)
+  - Some DC lines (low ADC inputs?)
+    - ![alt text](20241014_zoom_bande4.png) ![alt text](20241014_ADC_inputs.png)
+  - Lots of data losses:
+    - ![](20241014_head_id_lost.png)
+    - Black: Captured packets, color: 16 congituous packets for a 256-fft, White: lost
+
+
+## 2024/10/08
+- Carri
+  - Test and label each 10G links
+    - All fine
+  - Issue was not UDP flowding, but the packet themselves that used ff:ff:ff:ff:ff:ff as Dst_MAC (ROACH2 MAC tables default settings).
+    - Fixed by filing in MAC table of each 10G interfaces 
+      ```
+      macs = [0x00ffffffffffff, ] * 256
+      macs[180] = 0x9c63c0f82f6e
+      macs[181] = 0x9c63c0f82f6e
+      macs[182] = 0x9c63c0f82f6e
+      macs[183] = 0x9c63c0f82f6e
+      macs[184] = 0x9c63c0f82f6f
+      macs[185] = 0x9c63c0f82f6f
+      macs[186] = 0x9c63c0f82f6f
+      macs[187] = 0x9c63c0f82f6f
+      
+      #gbe.set_arp_table(macs) # will fail
+      macs_pack = struct.pack('>%dQ' % (len(macs)), *macs)
+      for gbe in self.fpga.gbes:
+          self.fpga.blindwrite(gbe.name, macs_pack, offset=0x3000)
+      ```
+
+      ``` bash
+      $ bmon -p 'ens7f*'
+      Interfaces                     │ RX bps       pps     %│ TX bps       pps     %
+       >ens7f0np0                    │   3.48GiB 450.81K     │    107B        1
+        ens7f1np1                    │   3.48GiB 450.90K     │      0         0
+      ───────────────────────────────┴───────────────────────┴──────────────────────────────────────────────────────      ───────────────────────────────────────────────────────────────────────────────────────
+           GiB                      (RX Bytes/second)                                                                B                      (TX Bytes/second)
+          3.48 ||||||......................................................                               120.      00 |.|.|.......................................................
+          2.90 ||||||......................................................                               100.      00 |.|.|.......................................................
+          2.32 ||||||......................................................                                80.      00 |.|.|.......................................................
+          1.74 ||||||......................................................                                60.      00 ||||||......................................................
+          1.16 ||||||......................................................                                40.      00 ||||||......................................................
+          0.58 ||||||......................................................                                20.      00 ||||||......................................................
+               1   5   10   15   20   25   30   35   40   45   50   55   60                                            1   5   10   15   20   25   30   35   40   45   50   55   60
+      ```
+
+      ``` bash
+      $ sudo tcpdump -i ens7f0np0 -en
+      12:42:43.758625 12:34:56:78:00:02 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.22.10002 > 192.168.5.182.10005: UDP, length 8256
+      12:42:43.758625 12:34:56:78:00:03 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.23.10003 > 192.168.5.183.10002: UDP, length 8256
+      12:42:43.758625 12:34:56:78:00:00 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.20.10000 > 192.168.5.180.10002: UDP, length 8256
+      12:42:43.758625 12:34:56:78:00:01 > 9c:63:c0:f8:2f:6e, ethertype IPv4 (0x0800), length 8298: 192.168.5.21.10001 > 192.168.5.181.10004: UDP, length 8256
+
+      $ sudo tcpdump -i ens7f1np1 -en
+      12:43:41.463232 12:34:56:78:00:06 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.26.10006 > 192.168.5.185.10001: UDP, length 8256
+      12:43:41.463238 12:34:56:78:00:04 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.24.10004 > 192.168.5.184.10002: UDP, length 8256
+      12:43:41.463240 12:34:56:78:00:05 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.25.10005 > 192.168.5.187.10002: UDP, length 8256
+      12:43:41.463244 12:34:56:78:00:07 > 9c:63:c0:f8:2f:6f, ethertype IPv4 (0x0800), length 8298: 192.168.5.27.10007 > 192.168.5.186.10003: UDP, length 8256
+      ```
+  - Tests that all 8 IPs configured on top of the 2 NICs interfaces can be listened to properly
+    ``` bash
+    (myPy3.12) user@highserver-xlr4a:~/socket_over_8_IP_over_2_NICs$ ./monitor_BHR_over_8_IPs.py
+    ('192.168.5.25', 10005)  ->  ('192.168.5.187', 10000)
+    ('192.168.5.20', 10000)  ->  ('192.168.5.180', 10000)
+    ('192.168.5.21', 10001)  ->  ('192.168.5.181', 10000)
+    ('192.168.5.22', 10002)  ->  ('192.168.5.182', 10000)
+    ('192.168.5.23', 10003)  ->  ('192.168.5.183', 10000)
+    ('192.168.5.24', 10004)  ->  ('192.168.5.184', 10000)
+    ('192.168.5.26', 10006)  ->  ('192.168.5.185', 10000)
+    ('192.168.5.27', 10007)  ->  ('192.168.5.186', 10000)
+    ('192.168.5.25', 10005)  ->  ('192.168.5.187', 10000)
+    ('192.168.5.20', 10000)  ->  ('192.168.5.180', 10000)
+    ('192.168.5.21', 10001)  ->  ('192.168.5.181', 10000)
+    ```
+
+
+## 2024/10/07
+- CARRI
+  - IC: Reboot serveur and install Mellanox ODEF
+  - CDV/ configure IPs
+    ```
+       ens7f0np0:
+            addresses: [ 192.168.5.180/24, 192.168.5.181/24, 192.168.5.182/24, 192.168.5.183/24 ]
+            mtu: 9000
+        ens7f1np1:
+            addresses: [ 192.168.5.184/24, 192.168.5.185/24, 192.168.5.186/24, 192.168.5.187/24 ]
+            mtu: 9000
+    ```
+  - Getting some data
+    ``` bash
+    $ sudo tcpdump -i ens7f1np1 -nn
+    07:30:08.070900 IP 192.168.5.27.10007 > 192.168.5.186.10000: UDP, length 8256
+    07:30:08.070908 IP 192.168.5.20.10000 > 192.168.5.180.10001: UDP, length 8256
+    ```
+
+    ``` bash
+    $ bmon -p 'ens7f*'
+    Interfaces                     │ RX bps       pps     %│ TX bps           pps     %
+      ens7f0np0                    │   1.74GiB 225.38K     │ 0         0
+      ens7f1np1                    │   1.74GiB 225.38K     │ 0         0
+    ───────────────────────────────┴───────────────────────┴─────────────────────    ─────────────────────────────────────────────────────────────────────────────    ──
+         GiB                      (RX Bytes/second) (TX Bytes/second)
+        1.74 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        1.45 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        1.16 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        0.87 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        0.58 ||||||||||||||||||.......................................... 0.    00 ............................................................
+        0.29 ||||||||||||||||||.......................................... 0.    00 ............................................................
+             1   5   10   15   20   25   30   35   40   45   50 55       60                  1   5   10   15   20   25   30   35 40   45       50   55   60
+    
+    ```
+  - CDV: Configure monitoring interface on S5850
+    - Not much useful for our application
+  - Expected data flow for pulsar_test_10g_v1.1.py:
+    - Fe = 3.7GSps
+    - FPGA Fsys = 231.25 MHz
+    - duty cycle = 50%
+    - 112915 pck/s, pck size = 1024 float64 + 8 int64 for header
+    - 8256 B/pkt
+    - 932 MB/s / 10G
+    - 7.458 GB/S
+  - But only getting 50% of it
+  - Lots of data sent back to ROACH2 (UDP_floading?)
+  - With only 1 10G connected on switch, the 2 40G NIC see 892 MiB/s (112 k pkt/s)
+  - Add VLAN to separate the 2 40G.
+  - With only 1 10G connected on switch, the ens7f0np0 40G NIC see 892 MiB/s (112 k pkt/s). OK. The other one sees nothing
+  - With 2 10G connected on switch, the ens7f0np0 40G NIC see 1.74 GiB/s (228 k pkt/s). OK.  The other one sees nothing.
+  - With 3 10G connected on switch, the ens7f0np0 40G NIC see 2.61 GiB/s (338 k pkt/s). A bit too low...  Dropped packets?  The other one sees nothing.
+  - With 4 10G connected on switch, the ens7f0np0 40G NIC still see 2.61 GiB/s (338 k pkt/s). Very low...  Dropped packets?   The other one sees nothing.
+  - With 2 x 4 10G connected on switch, both 40G NIC see 1.74 GiB/s (228 k pkt/s).  
+
+
+
+## 2024/10/04
+- CARRI
+  - Install 10/40G switch S5850-24S2Q  (https://www.fs.com/fr/products/122280.html)
+  - Connect 8 10G transceivers on ROACH2 to fiber panel to "Labo Hors-Champ"
+  - Connect 8 10G transceivers on S5850 to fiber panel to "Chariot"
+  - Connect 2 40G DAC between S5850 and CARRI server
+  - Test pulsar_test_10g_v1.1.py
+    - Trafic but server 40G NIC is not seen by system
+
+
+## 2024/09/04
+- ADC_receiver_V2
+  - Generate bitstream anyway, for test:
+    ```bash
+    $ cd ..../adc_receiver_v2/XPS_ROACH2_base
+    $ export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    $ source $XILINX_PATH/settings64.sh
+    $ cp -f etc/bitgen.ut implementation/bitgen.ut
+    $ cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+
+
+## 2024/09/04
+- ADC_receiver_V2
+  - Much better timing violations
+    - -0.430ns for adc0_asiaa_adc5g clock
+    - -1.4 ns for TS_epb_clk_in
+  - PlanAhead
+
+
+## 2024/09/03
+- ADC_receiver_V2
+  - Change pipeADC structure (Add pairs of not gates to force synthesiser to keep register fanout tree)
+  - Fit
+
+
+## 2024/08/20
+- ADC_receiver_V2
+  - Much better worst slacks (-1.264 in data_path, -2.5 in epb)
+  - Open with PlanAhead for analysis
+
+
+## 2024/08/12
+- ADC_receiver_V2
+  - Strange timing error in pipeADCs.
+    - Move ADCsnap to the end of the chain to prevent SLR16 to be in // of regs
+  - Start fit
+
+
+## 2024/08/07
+- ADC_receiver_V2
+  - Fit failed (congestionned areas)
+    - Move INST "*/rcvr[0123]_*" to the top
+  - Start fit
+  - Fit failed (routing) and the Java crashed (/home 100%...).  Restart everything and fit again.
+  
+
+## 2024/08/06
+- ADC_receiver_V2
+  - Change shift reg that feed channels
+  - Fixed INST "*/rcvr0_*/" to INST "*/rcvr0_*" because it matched nothing
+    - But log during compile say that it overrides previous loc constraints, so we may want to put this general loc constraint atop and then be more specific with finer grain constraints.
+
+
+## 2024/06/24 ... 2024/07/12
+- Lost logbook...
+
+
+## 2024/06/23
+- ADC_receiver_V2
+  - Add SLICE to rcvr*_decfir*col*_grp for tree_adder
+
+
+## 2024/06/19
+- ADC_receiver_V2
+  - Replace some SRL16 delays by reg-based delay lines
+  - NET KEEP doesn't seem to work for all fan-out reg-based tree.
+  - decfir0 and decfir1
+    - Split AREA_GROUP in 3 rectangles of 32 DSP for each 3 cols.
+  - Start fit
+  - UCF typos...
+  - Start fit
+  
+
+## 2024/06/18
+- ADC_receiver_V2
+  - W3OH observation processing of data gathered on the 2024/04/13
+    - DD and GG look close to what is generated by the current autocorrelator
+      - ![scan294257](20240618_scan294257.png)
+      - ![scan294256](20240618_scan294256.png)
+      - ![scan294255](20240618_scan294255.png)
+
+
+## 2024/06/15
+- ADC_receiver_V2
+  - Remove burster*/chan0/status reg
+  - Add reg on output of arb_gen*  (could be removed/commented out now that design is tested?)
+  - Merge TenGbE* status bits into same register field
+
+
+## 2024/06/11
+- ADC_receiver_V2
+  - W3OH observation processing of data gathered on the 2024/04/13
+    - Strong similarities with EE* / WW* from Historical autocorrelator:
+      - ![alt text](20240611_W3OH_294255.png)
+      - ![alt text](20240611_W3OH_294256.png)
+      - ![alt text](20240611_W3OH_294257.png)
+    - Some difference with EW / EW* and DD* / GG*
+
+
+## 2024/05/31
+- ADC_receiver_V2
+  - Timing violations:
+    - terrible...  INST "*_TenGbE0_ten_Gbe_v2/*" in AREA_GROUP are clearly not a good idea.
+    - PlanAhead
+  - Physically reverse channels in fabric to align them with 10G IPs.
+  - Move top pipeline regs into bursters to ease placement constraint.
+  - Network loss
+
+
+## 2024/05/31
+- ADC_receiver_V2
+  - In the .pou files of the NRT, Vdop qui contient des valeurs entre 8.29 et 8.44 (km/s)
+  - 8.3 km/s / c * 1665 MHz = 46 kHz. 
+  - This explains the frequency difference observed between NRT current tools and renard:/home/cedric.viou/BHR_NRT/reformat_galactic_pcap_and_process.py
+  - Make frequency plot correction
+
+
+## 2024/05/29
+- DHCP server not started after reboot.
+  - Start with : sudo /etc/init.d/dnsmasq restart
+  - Restart after each reboot: sudo systemctl enable dnsmasq
+
+
+## 2024/05/28
+- ADC_receiver_V2
+  - Timing violations:
+    - 2111701 paths analyzed, 469309 endpoints analyzed, 425 failing endpoints
+    - -1.390ns, -0.990ns, ...
+  - Missing xaui_phy_5 and 7 AREA_GROUP
+  - Add */TenGbE*/runt_gen_*, */TenGbE*/pipeline* and */TenGbE*/led_out_drv* AREA_GROUP
+  - Start fit
+  - Timing violations:
+    - adc0_clk  
+      - 2111701 paths analyzed, 469309 endpoints analyzed, 284 failing endpoints
+      - -0.952ns, ...
+    - epb_clk
+      - 1046789 paths analyzed, 39116 endpoints analyzed, 355 failing endpoints
+      - -7.3 ns
+    - xaui_clk
+      - 266062 paths analyzed, 34670 endpoints analyzed, 22 failing endpoints
+      - -1.219ns
+  - Add INST "*_TenGbE0_ten_Gbe_v2/*"          AREA_GROUP = "receiver0_grp";  for all 4 receivers.
+
+
+## 2024/05/27
+- ADC_receiver_V2
+  - Comment out histogram because fanout buffers get merged and break time violation
+  - Add longer delay lines for led_out drivers
+  - Start fit
+  
+
+## 2024/05/22
+- ADC_receiver_V2
+  - New neg slacks in fanout butters.
+  - Try -register_duplication; option in /FAN/HDD2/CASPER/mlib_devel_GIT/xps_base/XPS_ROACH2_base/etc/fast_runtime.opt
+  - Start fit.
+
+
+## 2024/05/22
+- ADC_receiver_V2
+  - Add reg in tengbe*/led_out_drv/pulse_extender/pos_detect to help timings.
+  - Don't look at others neg slacks for now...
+  - Start fit.
+
+
+## 2024/05/21
+- ADC_receiver_V2
+  - Add AREA_GROUP receiver2_decfir_sum_grp for */rcvr*/dec_fir*/convert*, real_sum and imag_sum
+  - Test in burster_sim a new scheme to restart samples_in counter.
+    - Sim ok.  Start fit.
+
+
+## 2024/05/17
+- ADC_receiver_V2
+  - Fitting 4 channels together rather than 2 generates about the same slacks.
+  - Issue in burster/samples_in.  rst input of counter is fed by or logic
+
+
+## 2024/05/16-17
+- ADC_receiver_V2
+  - Still getting neg slacks.
+  - Try to fit all 4 channels to see if this get similar on all 4 before trying to fully fix one
+
+
+## 2024/05/14
+- ADC_receiver_V2
+  - On rcvr0 only!
+    - Replace Round 39_30 bits to 16_15 bits by truncate to 18_17 bits and round (unbiased: ±Inf) to 16 bits
+  - Keep rcvr2 unmodified for comparison
+  - 
+
+
+## 2024/05/13
+- ADC_receiver_V2
+  - Replace dec_fir convert Round (unbiased: ±Inf) by Round (unbiased: even values)
+    - Fix_39_30 in, Fix_16_15 out
+    - Same timing violation
+  - Same RAM blocks violations
+
+
+## 2024/05/06
+- ADC_receiver_V2
+  - PipeADC[01] z^-4 in rcvr units get partially merged too with delay line delays
+  - Reduce pipeADC to z^-1
+  - Fit is now ok on that section
+  - But still failing in dec_fir convert and in RAM blocks
+  
+
+## 2024/05/05
+- ADC_receiver_V2
+  - Fanout tree for ADC0 and ADC1 always get optimised to a single delay line with last reg feeding all recvr unints -> placement cant be successful.
+  - Replace fanout tree by delay line with taps for each rcvr units.
+
+
+## 2024/04/19
+- ADC_receiver_V2
+  - Synthesys colapses fan-out registers inserted to ease timing.  But timing fails...  Find option to preserve them.
+  - In adc_receiver_v2/XPS_ROACH2_base/implementation/xflow.opt, activate these options
+    -register_duplication on;
+    -equivalent_register_removal off;
+
+
+## 2024/04/17
+- ADC_receiver_V2
+  - Clear coherence measured between pols on W3OH
+  - ![20240417_XC_W3OH](doc/20240417_XC_W3OH.png)
+
+
+## 2024/04/15
+- ADC_receiver_V2
+  - Process and plot data gathered on the 2024/04/13
+    ![20240413_W3OH](doc/20240413_W3OH.png)
+  - 1665.6 MHz and 1667.56 MHz lines are clearly visible
+
+
+## 2024/04/15
+- ADC_receiver_V2
+  - Replicate AREA_GROUP constraints for rcvr2
+  - Start fit
+  
+
+## 2024/04/13
+- ADC_receiver_V2
+  - No more neg slacks in rcvr0
+
+
+## 2024/04/12
+- ADC_receiver_V2
+  - Schedule W3OH data recording on Saturday 2024/04/13 02:05-03:00 TS
+    - nenufarobs@renard:/data/renard/BHR$ echo "sudo tcpdump -i p2p1 -n  src host 192.168.5.20 -C 1000 -w W3OH.pcap" | at 12:30 tomorrow
+
+
+## 2024/04/10
+- ADC_receiver_V2
+  - -3ns slacks between rcvr?/pipeadc1 and rcvr?/pipeadc?
+  
+
+## 2024/04/08
+- ADC_receiver_V2
+  - Composite spectrum of BF feed generated by stiching ~100Mhz bands of receiver (~50kHz resolution)
+    - ![BF feed](doc/20240408_BF_feed.png)
+  - Composite spectrum of HF feed generated by stiching ~100Mhz bands of receiver (~50kHz resolution)
+    - ![HF feed](doc/20240408_HF_feed.png)
+
+
+## 2024/04/06
+- ADC_receiver_V2
+  - Still getting some neg slacks in channels...
+  - Signal processing looks good.
+  - ![20240406_112+28MHz_HI.png](doc/20240406_112+28MHz_HI.png)
+  - HF feed tests
+    - At 1840 MHz, saturation before HBs, probably at dec_fir cast to Q16.15
+
+
+## 2024/04/02-04
+- ADC_receiver_V2
+  - Still getting some neg slacks in channels...
+  - Generate a bitstream anyway to test firmaware and write some python config code
+  - 112 and 28 MHz streams look functionnaly good
+    - But strange quantization present in Re/Im histogram -> put back some snap to pinpoint the origine of such structures
+    - ![20240405_112+28MHz.png](doc/20240405_112+28MHz.png)
+  - Recale units are wrong:
+    - ![20240405_rescale_bug](doc/20240405_rescale_bug.png)
+    - c2ReIm is wrong.  The way slicing is performed inside could explain why Re and Im behave differently.
+    - Fixed
+  - Start fit
+
+
+## 2024/03/25
+- ADC_receiver_V2
+  - Still getting some neg slacks in channels...
+
+
+## 2024/03/18
+- ADC_receiver_V2
+  - Same neg slacks in convert...
+  - PlanAhead
+  - Split rcvr0 area_gourp into 4 groups (L0, dec_fir, HBs, rescale)
+  - Start fit 
+- ROACH
+  - Add 10G link between ROACH and RENARD on old fiber link:
+    - MN03 03 04: SFP 10G ROACH_sfp0 to Renard p2p1 (cage further away from power supply)
+    - MN03 05 06: SFP 10G ROACH_sfp1 to Renard p2p2 (cage closest to power supply)
+    - MN03 08 (or 07?): SFP 1G Bidi from ROACH to Renard SEFRAM
+  - Configure new interface on renard:
+    - Update nenufarobs@renard:/etc/netplan/01-netcfg.yaml
+    - With p2p2, addresses: 192.168.5.181/24, mtu 9000
+    - sudo netplan appy
+  - On new link, fibers 1, 6 and 12 are broken.  The others 21 fibres are ok.
+
+
+## 2024/03/17
+- ADC_receiver_V2
+  - New neg slacks
+  - Increase pipeline to z^-3 in bit_select converts
+  - Add fanout buffer in convert
+  - Start fit
+
+
+## 2024/03/16
+- ADC_receiver_V2
+  - New neg slacks
+  - Add fanout buffer on PPS
+  - Start fit
+  - neg slacks in bit_select
+  - PlanAhead
+  - Increase pipeline to z^-2 in bit_select converts
+  - Start fit
+
+
+## 2024/03/15
+- ADC_receiver_V2
+  - neg slacks in TenGbE* and in bitselect
+  - Add some pipeline in TenGbE* and in bitselect to ease fit
+  - Start fit
+
+
+## 2024/03/14
+- ADC_receiver_V2
+  - Comment out debug snaps
+  - Add area constraints for each channels.
+  - Clone 4 channels
+  - Start fit
+
+
+## 2024/03/06
+- ADC_receiver_V1
+  - adc_receiver_v1_2024_Mar_05_2231.fpg
+    - Fix convergent roundings in rcvr0/rescale_unit?/bitselect_??
+- ADC_receiver_V2
+  - Clone 2 channels
+  - Replace "automatic" streamer config by simple registers
+  - Fit issue (-1.5ns)
+  - Duplicate loc constraints
+  - Fit issue (-0.3ns), but testable
+  
+
+## 2024/02/22
+- ADC_receiver_V1
+  - renard
+    - Create script of display UDP packet in realtime
+    - bitselect values are upside down -> fixed
+    - HI in 28 and 112 MHz BHR receiver mode
+    ![HI in 28 and 112 MHz receiver mode](doc/20240223_111746%20HI%20in%2028%20and%20112%20MHz%20receiver%20mode.png)
+
+
+## 2024/02/21
+- ADC_receiver_V1
+  - rcvr/HBs
+    - Add mechanism to raise DV only when sync is pulsed.
+    - Start fit
+    - Successful
+  - TenGbE0_spead_out_ss not stuck anymore
+  - Packets flowing to renard
+  - Values are saturated
+  - Increase bitselect selection range
+  - Start fit
+  - bitselect behavior is strange...
+
+
+## 2024/02/20
+- ADC_receiver_V1
+  - Framer not starting
+  - snap do not cover enough internal signals to understand issue.
+  - Add more signals
+  - Burster may not be started correctly
+  - Comment SEFRAM in design and ucf
+  - Start fit (done in 01:05 hours)
+  - burster_status_snap_ss looks ok
+  - TenGbE0_stream_in_bus_ss looks ok
+  - TenGbE0_spead_out_ss looks stuck
+  - ('TenGbE0_tx_afull', 1) and ('TenGbE0_tx_overflow', 1)
+  - Fiber was not connected -> fixed that
+  - Now TenGbE0_tx_cnt increase very quickly (malformed frames?)
+  - Test adc_c9r_sst_v5.py -> still ok
+
+
+## 2024/02/20
+- ADC_receiver_V1
+  - Comment out SEFRAM_snap
+  - SEFRAM starts computing as soon as mydesign.SEFRAM.arm() is called.
+    - That's probably not how we what this.  
+    - mydesign.SEFRAM.enable() seems to be a workaround (comment says "after dummy frame, allow outputing data and starting framer")
+  - burster seems to be stuck.
+    - Add snap for buster control signals
+    - Add snap for TenGbE input and TenGbE spead output
+  - Start fit
+  - Timing violation (-0.5 ns in dec_fir0)
+    - Probably ok for test.
+
+
+## 2024/02/19
+- ADC_receiver_V1
+  - HB filter gains better now (slightly > 0 dB)
+  - 10G streamer seems stuck
+    - Add snap to watch spead packetizer output
+    - Start fit
+    - But the network+spead conf may just be wrong
+  - Fit failed (in histogram, <0.3ns slack)
+  - Add network conf in receiver class
+
+
+## 2024/02/16
+- burster_sim.slx
+  - Adapt select_4f64 to get decimated stream
+- ADC_receiver_V1
+  - Integrate burster
+  - Start Fit
+  - Timing violation (-0.6 ns) in histogram
+
+
+## 2024/02/15
+- Valon
+  - Replacing Valon with SMC100A synthesizer (5dBm power output) greatly improves the feed spectrae
+    - ![20240215_BF_feed_CLKed_by_SMC100A](doc/20240215_BF_feed_CLKed_by_SMC100A.png)
+    - ![20240215_HF0_feed_CLKed_by_SMC100A](doc/20240215_HF0_feed_CLKed_by_SMC100A.png)
+    - ![20240215_HF1_feed_CLKed_by_SMC100A](doc/20240215_HF1_feed_CLKed_by_SMC100A.png)
+
+
+## 2024/02/13
+- Valon
+  - ADC input clock is probably too low, leading to this image around Fe/4
+  - Scan of Valon ouput level in (5, 2, -1, -4)
+  - ![20240213_ADC_input_clk](doc/20240213_ADC_input_clk.png)
+  - Image is 6dB lower at 5dBm input clock (5dBm on Valon, but signal is split and then balun on adc5g board may reduce that further...)
+  - Measure the clock input swing on adc5g boards.  It should be 447 mVpp ideally.
+
+
+## 2024/02/12
+- ADC_receiver_V1
+  - adc_receiver_v1_2024_Feb_05_1210.fpg
+  - Local HI visible at all filter stages
+  - ![20240212_HI_on_HBs](doc/20240212_HI_on_HBs.png)
+  - But loosing 9dB after each stages.
+  - No DC lines visible, except on the other polarisation, where the signal input level is very low.
+  - Change Coefficient Q(20, 17) to Q(20, 19).  Why that???
+  -  Start fit
+
+
+## 2024/02/08-09
+- ADC_calibrator.py + ADC.py
+  - Add functions for ADC calibration (manual and automatic)
+  
+
+## 2024/02/07
+- RFSoc
+  - Integration done
+- adc5g
+  - Create Gui for ADC calibration
+    - ![20240207_ADC_calibration_GUI](doc/20240207_ADC_calibration_GUI.png)
+    - Found that ADC cores are labeled as (1, 3, 2, 4).
+  
+
+## 2024/02/04
+- ADC_receiver_V1
+  - adc_receiver_v1_2024_Feb_03_1855
+    - Local HI visible on HBs_dec_out and HBs_HB0_out (for decimation = 2)
+    - But not wfor decimation = 8 (when HBs_HB2_out and HBs_HB1_out are used...)
+    - Replace HB2 and HB1 's coefficients by HB0's
+    - Start fit
+  - Test histogram on HBs
+    - ArmedSync connected in place of PPS -> can only see one value -> Propagate PPS from top to hist entity
+    - Abort fit
+    - Start fit
+    - Timing violation (-0.3 ns)
+    - Generate bitstream anyway (see logbook on the 2024/01/30)
+    - ...
+- RFSoc
+  - Integration almost done (chassis, power, fans, still missing some RF adaptors)
+
+
+## 2024/02/04
+- ADC_receiver_V1
+  - Timing violation: adc_receiver_v1_2024_Feb_03_2328
+
+
+## 2024/02/03
+- ADC_receiver_V1
+  - Fit too long.  Abort after ~20h
+  - Remove hist from HBs
+  - Start fit (much faster.  Bug on previous time or real issue with hist?)
+  - Fit ok: adc_receiver_v1_2024_Feb_03_1855
+  - Add a single hist to HBs and a 4-1 mux in front of it to select which bus to spy on.
+  - Start fit
+
+
+## 2024/02/02
+- ADC_receiver_V1
+  - Fit failed (receiver0 still present in ucf file)
+  - Start fit
+- Calibration ADC
+  - Strange behavor on offsets
+    - ADC0 ch2 and ADC1 ch3 (or 2?) don't seem to change
+
+
+## 2024/02/01
+- ADC_receiver_V1
+  - Local HI visible on dec_out
+  - Local HI visible on decim_4x_HB2_out
+    - ![20240201_HI_HB2_out](doc/20240201_HI_HB2_out.png)
+  - Local HI visible on decim_4x_HB1_out (HB2+HB1)
+    - ![20240201_HI_HB2+HB1_out](doc/20240201_HI_HB2+HB1_out.png)
+  - Local HI visible on decim_4x_HB0_out (HB2+HB1+HB0) -> decimation = 8 
+    - ![20240201_HI_HB2+HB1+HB0_out](doc/20240201_HI_HB2+HB1+HB0_out.png)
+    - But presence of a DC line
+  - Local HI visible on decim_4x_HB0_out (HB0 only) -> decimation = 2
+    - ![20240201_HI_HB0_out](doc/20240201_HI_HB0_out.png)
+    - No DC line
+  - With ADC noise dynamic close to maximum on receiver0 inputs, the noise dynamic is 15% on the output of dec_fir, 5% at the output of H0 only and 0.6% at the output of HB2+1+0.  The H0 filter might behave badly with low-level input signal and create this DC line.
+    - Replace -5 shift on dec_fir by -3 (gain of 4)
+    - Put back original HB2 and HB1 filter coefficients since they are not the identified cause of DC line, so that we can look at the actual gain of the chain.  And add gain in HB filters if needed.
+    - Start fit
+      - Error name too long: adc_receiver_v1_receiver0_decim_4x_hist_HB0_c0_im_b0_user_data_in
+      - Rename entities:
+        -  adc_receiver_v1/receiver0/decim_4x/hist/HB0/c0/im/b0  ->  adc_receiver_v1/rcvr0/HBs/hist/HB0/c0/im/b0
+
+
+## 2024/01/31
+- ADC_receiver_V0_1
+  - Test histogram.  Create class to be used in designs (histogram.py)
+  - Integrate histogram into ADC_receiver_V1
+
+
+## 2024/01/30
+- ADC_receiver_V1
+  - Fit: Timing violation
+  - Resume `gmake -f system.make bit` to generate `adc_receiver_v1/bit_files/*`
+    ```bash
+    $ cd ..../adc_receiver_v1/XPS_ROACH2_base
+    $ export XILINX_PATH=/FAN/HDD2/xilinx/14.7/ISE_DS
+    $ source $XILINX_PATH/settings64.sh
+    $ cp -f etc/bitgen.ut implementation/bitgen.ut
+    $ cd implementation ; bitgen -w -f bitgen.ut system ; cd .. ; bash gen_prog_files
+    ```
+  - Bit file generated -> to be tested
+  - Remove DSP48 used as adders in snapshot blocs to save them
+  - Start fit
+  - L0 mixer could be optimized (16x4 DSP48 -> 16x2 DPS48) by merging 2 samples into one DSP input
+    - Check that with L0_mixer_optim.slx
+
+
+## 2024/01/29
+- ADC_receiver_V0
+  - For LF feed, H1 line (and RFI) can be identified and correctly located with receivers configured at different L0
+    - 115-MHz wide band
+      - ![2receivers_BW=115MHz](doc/2receivers_BW=115MHz.png)
+      - ![2receivers_BW=115MHz_zoom](doc/2receivers_BW=115MHz_zoom.png)
+  - But not for 28-MHz wide band...
+    - No HI line
+    - DC line -> no convergeant rounding?
+    - Replace HB filters instances 2 and 1 by HB0 instances
+    - Add snap between HB filters
+    - Rework arb_gen and ADC_data mux to feed that to snap (and test that arb_gen is working correctly)
+
+
+## 2024/01/22
+- ADC_receiver_V0
+  - Testing firmware
+    - 2x decimation (112MHz-BW) looks good (1 dv / 2 clock_cycles)
+    - 2x+4x decimation (28MHz-BW) looks good (1 dv / 8 clock_cycles)
+    - For HF feed (1.6-3.2 GHz), the receiver.Fc property doesn't compute L0 tables properly.  Need to add Ny-window information.
+  
+
+## 2024/01/19
+- ADC_receiver_V0
+  - Reduce dec_fir filter length to 96 coefficients, still providing 50dB rejection in bandpass.
+  - Fit successful
+
+
+## 2024/01/19
+- ADC_receiver_V0
+  - Comment debuging snapshots to free up ressources
+  - Integrate histogram on adc[01]
+
+
+## 2024/01/16-18
+- ADC_receiver_V0
+  - Timing issues
+    - Edit /FAN/HDD2/cedric/NRT_spectro/adc_receiver_v0/XPS_ROACH2_base/casper_create_ppr.tcl (set proj_name adc_receiver_v0)
+    - cedric@nanunib:/FAN/HDD2/cedric/NRT_spectro/adc_receiver_v0/XPS_ROACH2_base$ ./casper_create_ppr.sh
+    - cd ../planahead
+    - planAhead
+  
+
+## 2024/01/12
+- ADC_receiver_V0
+  - Add receiver1 to test multi-chan mode
+
+
+## 2024/01/08-09
+- ADC_receiver_V0
+  - Fixing param/generic transferts between simulink, Matlab and HDL
+  - Fit Done! 
+
+
+## 2024/01/04-07
+- ADC_receiver_V0
+  - Instanciate HB_decimator in receiver
+  - Getting XSG generation failed
+    - Errors in HB_decimator_config.m first
+    - Then instanciations have generic map (...,  g_coef_list => "B0_coef", g_nof_coef => 0, ...)  -> simulink params not nicely forwarded to HDL.
+    - /FAN/HDD2/cedric/NRT_spectro/adc_receiver_v0/sysgen/synth_model/adc_receiver_v0.results
+      ```
+      Elaborating entity <HB_decimator> (architecture <behavioral>) with generics from library <work>.
+      ERROR:HDLCompiler:1242 - "/FAN/HDD2/cedric/NRT_spectro/adc_receiver_v0/sysgen/synth_model/adc_receiver_v0.vhd" Line 11937: "g_nof_coef is NOT of the form 3 + (2+2) * M, with M in natural numbers": 
+      Execution of entity hb_decimator failed
+      Netlist hb0_filter_entity_63b0845425(structural) remains a blackbox, due to errors in its contents
+      ```
+
+
+## 2024/01/01
+- half_band_filter_sim.slx
+  - We now have a parametrizable blackbox for HB_decimator.vhd
+
+
+## 2023/12/04
+- adc_sst_v7.py
+  - Wrong accumulation computation because Nfft is wrong now.
+  - Keeping 5 spec/s
+
+
+## 2023/11/17
+- Survey CEM
+  - Fix adc_sst_v7.py
+  - Start adc_sst_v7 on HF Feed at Fri Nov 17 2023 10:17:35 GMT+0000
+  - Quick plots look ok.
+  - Process and recording to be deployed by Ismaël
+
+
+## 2023/11/15
+- Survey CEM
+  - Retreive adc_sst_v7 for 4G mini-cell measurements
+  - Correct some register name in python that changed in SEFRAM.py
+
 
 ## 2023/11/13-15
 - ADC_receiver_V0
@@ -352,13 +1328,13 @@ TODO:
   - 10G links are not stuck anymore.
     - SEFRAM looks OK
     - First 10G interface prints (avr ~= 893.54MiB):
-    ```
-    19:19:51.380526 IP 192.168.5.20.10000 > 192.168.5.180.2002: UDP, length 8256
-    19:19:51.380544 IP 192.168.5.20.10000 > 192.168.5.180.2004: UDP, length 8256
-    19:19:51.380551 IP 192.168.5.20.10000 > 192.168.5.180.2005: UDP, length 8256
-    19:19:51.380562 IP 192.168.5.20.10000 > 192.168.5.180.2006: UDP, length 8256
-    19:19:51.380569 IP 192.168.5.20.10000 > 192.168.5.180.2007: UDP, length 8256
-    ```
+      ```
+      19:19:51.380526 IP 192.168.5.20.10000 > 192.168.5.180.2002: UDP, length 8256
+      19:19:51.380544 IP 192.168.5.20.10000 > 192.168.5.180.2004: UDP, length 8256
+      19:19:51.380551 IP 192.168.5.20.10000 > 192.168.5.180.2005: UDP, length 8256
+      19:19:51.380562 IP 192.168.5.20.10000 > 192.168.5.180.2006: UDP, length 8256
+      19:19:51.380569 IP 192.168.5.20.10000 > 192.168.5.180.2007: UDP, length 8256
+      ```
     - Dump some frames in pcap for later study
 
 
@@ -499,10 +1475,10 @@ TODO:
 
 - pulsar_mode_v0
   - Add AREA_GROUP and KEEP on
-    - ```*/pulsar_mode_v0_x0/adc1_*/converter*```
-    - ```*/pulsar_mode_v0_x0/adc1_*/pipeline*```
+    - `*/pulsar_mode_v0_x0/adc1_*/converter*`
+    - `*/pulsar_mode_v0_x0/adc1_*/pipeline*`
   - Start fit
-  - ```ERROR:ConstraintSystem:58 - Constraint <NET "*/pulsar_mode_v0_x0/adc0_*/pipeline*" KEEP=TRUE;> [system.ucf(1001)]: NET "*/pulsar_mode_v0_x0/adc0_*/pipeline*" does not match any design objects.```
+  - `ERROR:ConstraintSystem:58 - Constraint <NET "*/pulsar_mode_v0_x0/adc0_*/pipeline*" KEEP=TRUE;> [system.ucf(1001)]: NET "*/pulsar_mode_v0_x0/adc0_*/pipeline*" does not match any design objects.`
 
 
 ## 2023/01/06
@@ -512,17 +1488,17 @@ TODO:
   - Network conf is located in /etc/NetworkManager/system-connections
 - pulsar_mode_v0
   - Same timing violations.
-    - ```-equivalent_register_removal off;``` makes no difference
-  - Trying ```NET "net_name" KEEP=TRUE;``` on:
+    - `-equivalent_register_removal off;` makes no difference
+  - Trying `NET "net_name" KEEP=TRUE;` on:
     - sys_block_inst/sys_block_inst/fab_clk_counter
     - all other free running regs used in ffts and pfb that drive delays
       - pulsar_mode_v0_x0/sefram/fft0/fft_wideband_real/fft_biplex_real_4x/bi_real_unscr_4x/delay1/counter
-    - ```
-      NET "sys_block_inst/sys_block_inst/fab_clk_counter_*" KEEP=TRUE;
-      NET "*/delay*/counter/count_reg_*" KEEP=TRUE;
-      ```
+        ```
+          NET "sys_block_inst/sys_block_inst/fab_clk_counter_*" KEEP=TRUE;
+          NET "*/delay*/counter/count_reg_*" KEEP=TRUE;
+        ```
   - Fit failed (Slack > -1.2ns)
-    - But -2.8 ns slacks related to ```sys_block_inst/sys_block_inst/fab_clk_counter``` are now gone.
+    - But -2.8 ns slacks related to `sys_block_inst/sys_block_inst/fab_clk_counter` are now gone.
     - Still some violations to address but look more classical.
 
 
@@ -536,21 +1512,21 @@ TODO:
       For example: pulsar_mode_v0_x0/sefram/fft0/fft_wideband_real/fft_biplex_real_4x/bi_real_unscr_4x/delay1/counter
       - Try "equivalent_register_removal off" during map to prevent these registers to be merged.
       - Search for a way to do it in the ucf file instead in ![cgd.pdf](doc/cgd.pdf), ![web](https://www.xilinx.com/htmldocs/xilinx14_7/cgd.pdf)
-        - ```NET  "net_name"      KEEP=TRUE;```
-        - ```INST "instance_name" KEEP_HIERARCHY=TRUE;```
+        - `NET  "net_name"      KEEP=TRUE;`
+        - `INST "instance_name" KEEP_HIERARCHY=TRUE;`
     - Some involving ADC[01] interface
       - will look later at that.
   - Start map with
-  ```map -timing -detail -ol high -xe n -mt 2 -global_opt speed -equivalent_register_removal off -o system_map.ncd -w -pr b system.ngd```
+  `map -timing -detail -ol high -xe n -mt 2 -global_opt speed -equivalent_register_removal off -o system_map.ncd -w -pr b system.ngd`
     - OK
   - Start par with 
-  ```par -xe c -w -ol high -mt 4 system_map.ncd system.ncd system.pcf```
+  `par -xe c -w -ol high -mt 4 system_map.ncd system.ncd system.pcf`
     - OK
   - Start post_par_trce with
-  ```trce -e 200 -xml system.twx system.ncd system.pcf```
+  `trce -e 200 -xml system.twx system.ncd system.pcf`
   - Same timing violations....  Something gone wrong with manual commands?
   - Start fit with fast_runtime.opt map section modified
-  ```-equivalent_register_removal off;```
+  `-equivalent_register_removal off;`
 
 
 
@@ -598,7 +1574,7 @@ TODO:
   - Start fit
     - Not better
     - Add z^-1 in 10G led drivers to ease timing closure
-    - In /FAN/HDD2/CASPER/mlib_dev/xps_base/XPS_ROACH2_base/etc/fast_runtime.opt, remove ```-register_duplication on;``` as it conflicts with ```equivalent_register_removal```
+    - In /FAN/HDD2/CASPER/mlib_dev/xps_base/XPS_ROACH2_base/etc/fast_runtime.opt, remove `-register_duplication on;` as it conflicts with `equivalent_register_removal`
   - Start fit
     - Failed
 
@@ -901,9 +1877,11 @@ TODO:
 - Caps in design name error checking:
   - Save galactic_h1_4x28mhz_v1 as galactic_H1_4x28mhz_v1
   - Start fit
-  - Failing with :```
-  Error detected running CASPER XPS:
-  Cannot find any compiled XSG netlist.  Have you run the Xilinx System Generator on your design ?```
+  - Failing with :
+    ```
+    Error detected running CASPER XPS:
+    Cannot find any compiled XSG netlist.  Have you run the Xilinx System Generator on your design ?
+    ```
 
 - pulsar_test_10g_v0
   - Cloned from galactic_h1_4x28mhz_v1
@@ -1042,10 +2020,10 @@ TODO:
 - adc_c9r_sst_v4.slx
   - Fit failed with 2 -0.01ns violation on fft_shift (static signal)
   - Force bitstream generation
-    - ```bash
-      adc_c9r_sst_v4/XPS_ROACH2_base$ bitgen -w -f bitgen.ut system
-      ./gen_prog_files
-      ```
+    ```bash
+    adc_c9r_sst_v4/XPS_ROACH2_base$ bitgen -w -f bitgen.ut system
+    ./gen_prog_files
+    ```
   - SEFRAM not working
   - Strange data on channelizer (RFI?)
   - Clone as adc_c9r_sst_v5 for debug
@@ -1332,13 +2310,13 @@ TODO:
   - Modify /FAN/HDD2/CASPER/mlib_dev/casper_library/bus_replicate_init.m:107
   - Replace srl16 by reg-based pipeline
     ```matlab
-        %reuse_block(blk, dname, 'xbsIndex_r4/Delay', ...
-        %  'reg_retiming', reg_retiming, 'latency', '1', ...
-        %  'Position', [xpos_tmp-del_w/2 ypos_tmp-del_d/2 xpos_tmp+del_w/2 ypos_tmp+del_d/2]);
-        
-        reuse_block(blk, dname, 'casper_library_delays/pipeline', ...
-          'latency', '1', ...
-          'Position', [xpos_tmp-del_w/2 ypos_tmp-del_d/2 xpos_tmp+del_w/2 ypos_tmp+del_d/2]);
+    %reuse_block(blk, dname, 'xbsIndex_r4/Delay', ...
+    %  'reg_retiming', reg_retiming, 'latency', '1', ...
+    %  'Position', [xpos_tmp-del_w/2 ypos_tmp-del_d/2 xpos_tmp+del_w/2 ypos_tmp+del_d/2]);
+    
+    reuse_block(blk, dname, 'casper_library_delays/pipeline', ...
+      'latency', '1', ...
+      'Position', [xpos_tmp-del_w/2 ypos_tmp-del_d/2 xpos_tmp+del_w/2 ypos_tmp+del_d/2]);
     ```
   - Generate fft_wideband_real and nrt_bw1800_ch2048_fft_core
   - resynth_netlist('nrt_bw1800_ch2048_fft_core')
@@ -1588,13 +2566,12 @@ TODO:
       - 1000: One-channel mode (channel A, 5 Gsps), ADC board input I
       - 1010: One-channel mode (channel C, 5 Gsps), ADC board input Q
   - Using the python lib:
-```python
-adcmode = {'I': b1000,
-           'Q': b1010}
-adc5g.spi.set_spi_control(roach, zdok_n, adcmode=adcmode['I'])
-adc5g.spi.set_spi_control(roach, zdok_n, adcmode=adcmode['Q'])
-```
-
+    `python
+    adcmode = {'I': b1000,
+               'Q': b1010}
+    adc5g.spi.set_spi_control(roach, zdok_n, adcmode=adcmode['I'])
+    adc5g.spi.set_spi_control(roach, zdok_n, adcmode=adcmode['Q'])
+    `
 
 ## 2022/08/04
 
@@ -1789,35 +2766,35 @@ adc5g.spi.set_spi_control(roach, zdok_n, adcmode=adcmode['Q'])
     - This has to be tested with the actual feed since it seems to have sharper edges.
     - To increase the guard band, could we slightly increase the Fs?  2x 1.85 GHz?  2x 1.9 GHz?
   
-```graphviz
-digraph hierarchy {
-  nodesep=1.0 // Increases the separation between nodes
+      ```graphviz
+      digraph hierarchy {
+        nodesep=1.0 // Increases the separation between nodes
+      
+        node [color=Red,fontname=Courier,shape=box] // All nodes will this shape and colour
+        edge [color=Blue, style=dashed] // All the lines look like this
+      
+        subgraph cluster_roach{
+          label ="ROACH2";
+          adc0 [label=ADC0];
+          adc1 [label=ADC1];
+          {rank=same;adc0 adc1} // Put them on the same level
+          fpga [label=FPGA];
+      
+        }
+        
+        noise [label="Noise Diode"];
+        noise -> splitter
+        sine -> splitter
+        splitter -> "Band Pass"
+        "Band Pass" -> adc0
+        Open -> adc1
+        adc0 -> fpga
+        adc1 -> fpga
+      
+      }
+      ```
 
-  node [color=Red,fontname=Courier,shape=box] // All nodes will this shape and colour
-  edge [color=Blue, style=dashed] // All the lines look like this
-
-  subgraph cluster_roach{
-    label ="ROACH2";
-    adc0 [label=ADC0];
-    adc1 [label=ADC1];
-    {rank=same;adc0 adc1} // Put them on the same level
-    fpga [label=FPGA];
-
-  }
-  
-  noise [label="Noise Diode"];
-  noise -> splitter
-  sine -> splitter
-  splitter -> "Band Pass"
-  "Band Pass" -> adc0
-  Open -> adc1
-  adc0 -> fpga
-  adc1 -> fpga
-
-}
-```
-
-![equivalent_noise_from_LF_feed](./doc/equivalent_noise_from_LF_feed.png)
+      ![equivalent_noise_from_LF_feed](./doc/equivalent_noise_from_LF_feed.png)
 
 
 - Extrapolation for HF feed
@@ -2136,15 +3113,16 @@ The circulator provides an extra 10 dB power drop in the band of the LF feed.
 
 - Setting up TGR6000 frequency generato to work with VISA
   - Requires python 3.6+
-  ```pip install pyvisa
-  import pyvisa as visa
-  visa.__version__  ->  '1.11.3'
-  rm = visa.ResourceManager()
-  inst = rm.open_resource("TCPIP0::192.168.1.100::9221::SOCKET", read_termination='\n', write_termination='\n')
-  inst.query("*IDN?")
-  inst.write('freq 21.12345')
-  inst.write('MVLEV 10')
-  ```
+    ```python
+    pip install pyvisa
+    import pyvisa as visa
+    visa.__version__  ->  '1.11.3'
+    rm = visa.ResourceManager()
+    inst = rm.open_resource("TCPIP0::192.168.1.100::9221::SOCKET", read_termination='\n', write_termination='\n')
+    inst.query("*IDN?")
+    inst.write('freq 21.12345')
+    inst.write('MVLEV 10')
+    ```
   - ERROR in doc: freq is MHZ, not HZ
 
 
@@ -2241,7 +3219,7 @@ The circulator provides an extra 10 dB power drop in the band of the LF feed.
 ## 2022/03/07
 
 - OGP calibration with https://github.com/nrao/adc5g_devel not fantastic
-- Try fitting ```x[0] + x[1]*np.sin(wt[:,core_idx] + x[2])``` instead of ```p[0] +  p[1] * sin + p[2] * cos```
+- Try fitting `x[0] + x[1]*np.sin(wt[:,core_idx] + x[2])` instead of `p[0] +  p[1] * sin + p[2] * cos`
 
 
 ## 2022/02/22
@@ -2702,11 +3680,11 @@ The circulator provides an extra 10 dB power drop in the band of the LF feed.
   - nanunib NIC is not working (link always down)
   - ROACH is streaming data with roach2_tut_tge tutorial -> roach.pcap read:
   - No.	Time	Source	Destination	Protocol	Length	Info
-```
-1	0.000000	192.168.5.20	192.168.10.13	UDP	1066	10000 → 60000 Len=1024
-2	0.000163	192.168.5.20	192.168.10.13	UDP	1066	10000 → 60000 Len=1024
-3	0.000327	192.168.5.20	192.168.10.13	UDP	1066	10000 → 60000 Len=1024
-```
+    ```
+    1	0.000000	192.168.5.20	192.168.10.13	UDP	1066	10000 → 60000 Len=1024
+    2	0.000163	192.168.5.20	192.168.10.13	UDP	1066	10000 → 60000 Len=1024
+    3	0.000327	192.168.5.20	192.168.10.13	UDP	1066	10000 → 60000 Len=1024
+    ```
 
 ## 2021/09/21
 

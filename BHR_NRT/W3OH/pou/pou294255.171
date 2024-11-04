@@ -1,0 +1,78 @@
+
+ -------------------------------------------------------------------------------
+          SOU   764.131 --> W3OH VLBI                                                   
+          MAP    53.131 --> vvs c8 195kHz e^2w^2ewew* -450 mode4  x2k canaux  2k canuax 
+          SCAN:294255
+
+ Coordonnees   1950  : asd=   2.38792     dec=  61.64944
+ Coordonnees reduites: asd=   2.48084     dec=  61.98277
+   Mouvements propres:mvpa=  0.000000    mvpd=  0.000000    mvpr=  0.000000
+ Angle de rotation du cornet au meridien=     -45.0 degres
+ Type de poursuite=PX
+ AH debut theorique=  -70.4       AH actuel=  -23.5       AH fin theorique=   70.4
+
+Positions actuelles:
+ X= 15401   Z=    -2   Y=    -1   R=-45.1   Xc= 1   Yc=   0   I=39714:39809   Ith=39745
+ tx =   99.tz =    4.ty =    3.txc=    0.tyc=    0.tr =    2.ti =  359.
+ tx =   88.tz =    4.ty =    3.txc=    0.tyc=    0.tr =    1.ti =  358.
+ tx =   13.tz =    6.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   99.tz =    4.ty =    3.txc=    0.tyc=    0.tr =    2.ti =  359.
+ tx =   88.tz =    4.ty =    3.txc=    0.tyc=    0.tr =    1.ti =  358.
+ tx =   13.tz =    6.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    6.ty =    3.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+ tx =   13.tz =    5.ty =    0.txc=    0.tyc=    0.tr =    0.ti =    0.
+
+
+      Calcul de la poursuite de   3 cycle(s) sur  1 section(s) termine par:
+          -depassement du nombre de cycle impose
+
+          TU de debut de manip = 13/04/24 12:27:47.00   TS= 2:05:18.80         
+          Duree de positionnement          0:05:45.00
+          TU de debut poursuite= 13/04/24 12:33:32.00   TS= 2:11:04.74         
+          TU de pass.  meridien= 13/04/24 12:51:15.38   TS= 2:28:51.03         
+          TU de fin poursuite  = 13/04/24 12:43:33.00   TS= 2:21:07.39         
+
+          Cornet utilise=1
+
+ Cycle   1 Inclinaison 37971
+ ---------------------------
+  Per  TUrel.   Duree    Ahf    Xf    Zf  Yf  Rf   Ycf  Site   Azim.   Vdop.
+  ---  ------   -----    ---    --    --  --  --   ---  ----   -----   -----
+    1    0.00   15.04  -17.5 -10064    0  -23 -48.9   0 75.178 -171.940    8.28
+    2   15.00   86.24  -16.1  -9240   53  -23 -48.9   0 75.210 -172.588    8.28
+    3  101.00   14.04  -17.5 -10064    0  -23 -48.9   0 75.178 -171.940    8.42
+    4  115.00   86.24  -16.1  -9240   53  -23 -48.9   0 75.210 -172.588    8.42
+ Cycle   2 Inclinaison 37971
+ ---------------------------
+    5  201.00   14.04  -14.2  -8146  117   23 -48.1   0 75.250 -173.452    8.28
+    6  215.00   86.24  -12.7  -7321  159   23 -48.1   0 75.276 -174.107    8.29
+    7  301.00   14.04  -14.2  -8146  117   23 -48.1   0 75.250 -173.452    8.42
+    8  315.00   86.24  -12.7  -7321  159   23 -48.1   0 75.276 -174.107    8.43
+ Cycle   3 Inclinaison 37971
+ ---------------------------
+    9  401.00   14.04  -10.8  -6227  209  -23 -47.4   0 75.307 -174.980    8.29
+   10  415.00   86.24   -9.4  -5402  241  -23 -47.4   0 75.326 -175.641    8.29
+   11  501.00   14.04  -10.8  -6227  209  -23 -47.4   0 75.307 -174.980    8.43
+   12  515.00   86.24   -9.4  -5402  241  -23 -47.4   0 75.326 -175.641    8.43
+
+                    Duree (TU) totale de ralliement= 0:01:25.00
+                    Duree (TU) totale de tracking  = 0:08:35.99
+                    Duree (TU) totale de la manip  = 0:10:00.99
+                    Duree (TU) moyenne du cycle    = 0:03:20.33
+ STOPCODE=   0
