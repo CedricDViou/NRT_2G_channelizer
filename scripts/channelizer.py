@@ -32,6 +32,7 @@
 ################################################################################
 
 import time
+import struct
 import numpy as np
 
 class galactic_channelizer(object):
@@ -156,6 +157,7 @@ class pulsar_channelizer(object):
 
   def enable(self):
     self.fpga.write_int('TenGbE_rst', 0x00)
+    # reset reorder
     self.fpga.write_int('channelizer_arm', 1)
     self.fpga.write_int('channelizer_arm', 0)
 
@@ -234,19 +236,20 @@ class pulsar_channelizer(object):
 
 
 class receiver(object):
-  def __init__(self, fpga=None, Fe=None, decimation=None, receiver_basename='receiver_', NCO_basename='L0_%d_mem', HB_basename='HB_', network_basename='TenGbE0_'):
+  def __init__(self, fpga=None, Fe=None, decimation=None, receiver_basename='receiver_', NCO_basename='L0_%d_mem', HB_basename='HB_', burster_basename="burster_", network_basename='TenGbE0_'):
     assert fpga is not None
     assert Fe is not None
     assert decimation is not None
     self.fpga = fpga
     self.Fe = int(Fe)
     self.receiver_basename = receiver_basename
+    self.scale_basename = self.receiver_basename+'bitselect'
     self.NCO_basename = self.receiver_basename + NCO_basename
     self.HB_basename = self.receiver_basename + HB_basename
+    self.burster_basename = burster_basename
     self.network_basename = network_basename
-    self.scale_basename = self.receiver_basename+'bitselect'
     self._kc = 0
-    self.K = 1024     # NCO can be configured from 0 to K-1
+    self.K = 1024     # NCO kc can be configured from 0 to K-1
     self.NCO_par = 16 # NCO processes 16 samples in //
     self.NCO_tables = None
     self.decimation = decimation  # receiver1_HBs_true
@@ -257,21 +260,86 @@ class receiver(object):
 
 
   def __repr__(self):
-    return "Receiver(fpga=%s, Fe=%d, receiver_basename=\'%s\', NCO_basename=\'%s\', HB_basename=\'%s\', network_basename=\'%s\')" % (
+    return "Receiver(fpga=%s, Fe=%d, receiver_basename=\'%s\', NCO_basename=\'%s\', HB_basename=\'%s\', burster_basename=\'%s\', network_basename=\'%s\')" % (
             str(self.fpga),
             self.Fe,
             self.receiver_basename,
             self.NCO_basename,
             self.HB_basename,
+            self.burster_basename,
             self.network_basename,
             )
 
 
   def disable(self):
-    raise Exception('NOT IMPLEMENTED')
+    self.fpga.write_int(self.network_basename + 'rst', 3)
+    self.fpga.write_int(self.burster_basename + 'rst', 1)
+    self.fpga.write_int(self.receiver_basename + 'rst', 1)
+
 
   def enable(self):
-    raise Exception('NOT IMPLEMENTED')
+    self.fpga.write_int(self.receiver_basename + 'rst', 0)
+    self.fpga.write_int(self.burster_basename + 'rst', 0)
+    self.fpga.write_int(self.network_basename + 'rst', 0)
+
+  def status(self):
+    return self.fpga.read_uint(self.network_basename + 'status')
+
+  def force_eof(self):
+    self.fpga.write_int('TenGbE_force_eof', 1)
+    self.fpga.write_int('TenGbE_force_eof', 0)
+
+  def network_config(self, dst_ip, dst_port):
+    print('Write MAC table')
+    # MAC table
+    # 192.168.5.180-183  9c63c0f82f6e (CARRI)
+    # 192.168.5.184-187  9c63c0f82f6f (CARRI)
+    # 192.168.5.190      b0262849fcc0 (Renard)
+    # 192.168.5.191      b0262849fcc1 (Renard)
+    
+    macs = [0x00ffffffffffff, ] * 256
+    macs[180] = 0x9c63c0f82f6e
+    macs[181] = 0x9c63c0f82f6e
+    macs[182] = 0x9c63c0f82f6e
+    macs[183] = 0x9c63c0f82f6e
+    macs[184] = 0x9c63c0f82f6f
+    macs[185] = 0x9c63c0f82f6f
+    macs[186] = 0x9c63c0f82f6f
+    macs[187] = 0x9c63c0f82f6f
+    macs[190] = 0xb0262849fcc0
+    macs[191] = 0xb0262849fcc1
+    
+    #gbe.set_arp_table(macs) # will fail
+    macs_pack = struct.pack('>%dQ' % (len(macs)), *macs)
+    for gbe in self.fpga.gbes:
+        self.fpga.blindwrite(gbe.name, macs_pack, offset=0x3000)
+    
+    #for gbe in self.fpga.gbes:
+    #    print(gbe.get_arp_details()[170:190])
+
+
+    print('Config SPEAD packets')
+    self.fpga.write_int(self.network_basename + 'hdr_ADC_Freq'      ,     int(self.Fe/1e6), blindwrite=True)  # So... used to store sampling frequency
+    self.fpga.write_int(self.network_basename + 'hdr_kc'            , self.kc)
+    self.fpga.write_int(self.network_basename + 'hdr_pkt_len_words' , 1024)
+    self.fpga.write_int(self.network_basename + 'hdr_decimation'    , self.decimation)
+    self.fpga.write_int(self.network_basename + 'hdr_nof_spf'       , 2048)
+    self.fpga.write_int(self.network_basename + 'hdr7_free'         , 6)
+
+    print('Config IP/UDP')
+    self.fpga.write_int(self.network_basename + 'dst_ip', dst_ip, blindwrite=True)
+    self.fpga.write_int(self.network_basename + 'dst_port', dst_port)
+
+
+  @property
+  def scale(self):
+    self._scale = self.fpga.read_uint(self.scale_basename)
+    return self._scale
+
+  @scale.setter 
+  def scale(self, value):
+    self._scale = value
+    self.fpga.write_int(self.scale_basename, self._scale)
 
   def NCO_calc_tables(self):
     NCO_w = 16
@@ -349,11 +417,13 @@ class receiver(object):
       dt, shape, d_w, d_dp = np.dtype('int64'), (-1), 40, 30 
     elif snap_name == "dec_fir0_sr5_out":
       dt, shape, d_w, d_dp = np.dtype('int64'), (-1), 40, 30
-        
+    elif snap_name == "rescale_out":
+      dt, shape, d_w, d_dp = np.dtype('int8'), (-1, 4), 8, 7
+     
     dt = dt.newbyteorder('>')
     tmp = np.frombuffer(data[0]['data'], dtype=dt).copy()
     if raw_fmt:
-      return tmp
+      return (None, None), tmp
 
     tmp[tmp>2**(d_w-1)-1] -= 2**d_w
     tmp = tmp / 2.0**d_dp
@@ -393,22 +463,5 @@ class receiver(object):
     self._decimation = value
     self.fpga.write_int( self.receiver_basename + "HBs_true", configs[value])
 
-  @property
-  def scale(self):
-    self._scale = self.fpga.read_uint(self.scale_basename)
-    return self._scale
-  
-  @scale.setter 
-  def scale(self, value):
-    self._scale = value
-    raise Exception('NOT IMPLEMENTED')
-    self.fpga.write_int(self.scale_basename, self._scale)
-
-
-  def force_eof(self):
-    raise Exception('NOT IMPLEMENTED')
-
-  def network_config(self, dst_IP, dst_port):
-    raise Exception('NOT IMPLEMENTED')
 
 
