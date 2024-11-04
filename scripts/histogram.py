@@ -87,7 +87,8 @@ class histogram(object):
             bit_num = range(self.buses[bus]['width'])
             bar = ax.bar(bit_num,
                          self.buses[bus]['counts'],
-                         log=True)
+                         log=True,
+                         label=bus)
             self.bars.append(bar)
             ax.set_xticks(bit_num)
             ax.set_xticklabels(bit_num)
