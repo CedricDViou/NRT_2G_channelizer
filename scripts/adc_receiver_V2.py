@@ -61,13 +61,13 @@ histogram = imp.reload(histogram)
 
 
 roach2 = "192.168.40.71"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_03_1855.fpg"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_05_1210.fpg"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_19_1128.fpg"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_20_1203.fpg"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_21_1135.fpg"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Feb_22_1200.fpg"
-bitstream = "../bof/adc_receiver_v1/adc_receiver_v1_2024_Mar_05_2231.fpg"
+bitstream = "../bof/adc_receiver_v2/adc_receiver_v2_2024_Apr_03_1713.fpg"
+bitstream = "../bof/adc_receiver_v2/adc_receiver_v2_2024_Apr_05_0946.fpg"
+bitstream = "../bof/adc_receiver_v2/adc_receiver_v2_2024_Apr_05_1818.fpg"
+bitstream = "../bof/adc_receiver_v2/adc_receiver_v2_2024_Oct_28_1027.fpg"
+bitstream = "../bof/adc_receiver_v2/adc_receiver_v2_2024_Oct_30_1703.fpg"
+bitstream = "../bof/adc_receiver_v2/adc_receiver_v2_2024_Oct_31_1637.fpg"
+
 
 conf_Valon = True
 ADC_DVW_cal = True
@@ -126,24 +126,32 @@ class NRT_channelizer(object):
       # Channelizer
       'sync_cnt',
       'armed_sync_cnt',
+
       'TenGbE0_tx_cnt',
-      'TenGbE0_data_overflow',
-      'TenGbE0_tx_afull',
-      'TenGbE0_tx_overflow',
+      'TenGbE0_status', # spead_overflow, tx_afull, tx_overflow
+      
+      'TenGbE1_tx_cnt',
+      'TenGbE1_status', # spead_overflow, tx_afull, tx_overflow
+
+      'TenGbE2_tx_cnt',
+      'TenGbE2_status', # spead_overflow, tx_afull, tx_overflow
+
+      'TenGbE3_tx_cnt',
+      'TenGbE3_status', # spead_overflow, tx_afull, tx_overflow
+
+
     )
 
     # Add peripherals and submodules
     self.ADCs = (ADC.ADC(fpga=self.fpga, zdok_n=0, Fe=self.Fe, snap_basename='adcsnap'),
                  ADC.ADC(fpga=self.fpga, zdok_n=1, Fe=self.Fe, snap_basename='adcsnap'))
 
-    if SEFRAM_conf:
-      self.SEFRAM = sefram.sefram(fpga=self.fpga, Fe=self.Fe)
-      self.SEFRAM.disable()
-
     self.Receivers = [channelizer.receiver(fpga=self.fpga, Fe=self.Fe, decimation=2, receiver_basename="rcvr0_", burster_basename="burster0_", network_basename='TenGbE0_'),
-                      #channelizer.receiver(fpga=self.fpga, Fe=self.Fe, decimation=2, receiver_basename="rcvr1_"),
+                      channelizer.receiver(fpga=self.fpga, Fe=self.Fe, decimation=2, receiver_basename="rcvr1_", burster_basename="burster1_", network_basename='TenGbE1_'),
+                      channelizer.receiver(fpga=self.fpga, Fe=self.Fe, decimation=2, receiver_basename="rcvr2_", burster_basename="burster2_", network_basename='TenGbE2_'),
+                      channelizer.receiver(fpga=self.fpga, Fe=self.Fe, decimation=2, receiver_basename="rcvr3_", burster_basename="burster3_", network_basename='TenGbE3_'),
                       ]
-    self.histograms = histogram.histogram(fpga=self.fpga, basename='histogram_')
+    # self.histograms = histogram.histogram(fpga=self.fpga, basename='histogram_')
 
 
 
@@ -168,7 +176,16 @@ class NRT_channelizer(object):
 
   def monitor(self):
     for reg in self.monitoring_regs:
-        print(reg, self.fpga.read_uint(reg))
+        val = self.fpga.read_uint(reg)
+        msg = ''
+        if reg.endswith('status'):
+          if val & 0x04:
+            msg += "spead_overflow! "
+          if val & 0x02:
+            msg += "tx_afull! "
+          if val & 0x01:
+            msg += "tx_overflow! "
+        print(reg, self.fpga.read_uint(reg), msg)
 
   def PPS_presents(self, nof_PPS=1):
     for pps in range(nof_PPS):
@@ -264,7 +281,6 @@ if ADC_DVW_cal:
   print('Done')
 
 
-
 mydesign.input_sel(source='ADC')
 #mydesign.input_sel(source='Arb_gen')
 #mydesign.conf_arb_gen(mode="constant", amp=10)
@@ -285,164 +301,96 @@ for ADC_axs, ADC in zip(axs, mydesign.ADCs):
 plt.tight_layout()
 plt.show(block=False)
 
-mydesign.histograms.get_counts()
-mydesign.histograms.plot_counts()
-
-
-if SEFRAM_conf:
-  print('SEFRAM Configuration')
-  
-  mydesign.SEFRAM.disable()
-  mydesign.cnt_rst()
-  time.sleep(0.2)
-  
-  
-  
-  Nspec_per_sec = mydesign.SEFRAM.Fe / mydesign.SEFRAM.Nfft
-  acc_len = int(Nspec_per_sec // 10)
-  mydesign.SEFRAM.acc_len = acc_len
-  
-  print('vacc_n_frmr_acc_cnt = ', mydesign.SEFRAM.acc_cnt)
-  
-  fft_shift_reg = 0b1111111111
-  mydesign.SEFRAM.fft_shift = fft_shift_reg
-  print('SEFRAM FFT gain = ', mydesign.SEFRAM.fft_gain)
-  
-  mydesign.SEFRAM.dst_addr = ("192.168.41.1", 0xcece)
-  mydesign.SEFRAM.IFG = 100000
-  mydesign.SEFRAM.print_datarate()
-
-  mydesign.SEFRAM.arm()    # à renomer
-
-
+#mydesign.histograms.get_counts()
+#mydesign.histograms.plot_counts()
 
 print('Receivers Configuration')
 receiver_configs = [
-                    #{"Fc":1.623e9, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
-                    #{"Fc":1.628e9, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce01, },
-                    #{"Fc":100e6, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
-                    #{"Fc":60e6, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce01, },
-                    #{"Fc":1.421e9, "decimation": 8, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
-                    {"Fc":1.615e9, "decimation": 8, "dst_IP": 0xc0a805b4, "dsp_port": 0xce01, },
-                    {"Fc":1.425e9, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce01, },
+                    #{"Fc":1.415e9, "decimation": 8, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },   # local HI
+                    #{"Fc":1.415e9, "decimation": 2, "dst_IP": 0xc0a805b5, "dsp_port": 0xce02, },   # local HI
+                    #{"Fc":1.385e9, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
+                    #{"Fc":1.295e9, "decimation": 2, "dst_IP": 0xc0a805b5, "dsp_port": 0xce02, },
+                    #{"Fc":0.900e9, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
+                    #{"Fc":1.800e9, "decimation": 2, "dst_IP": 0xc0a805b5, "dsp_port": 0xce02, },
+                    #{"Fc":1.6e9, "decimation": 2, "dst_IP": 0xc0a805b4, "dsp_port": 0xce00, },
+                    #{"Fc":1.6e9, "decimation": 8, "dst_IP": 0xc0a805b5, "dsp_port": 0xce02, },
+                    {"Fc":1.000e9, "decimation": 8, "dst_IP": 0xc0a805be, "dsp_port": 0xce00, },  # OH
+                    {"Fc":1.100e9, "decimation": 8, "dst_IP": 0xc0a805be, "dsp_port": 0xce01, },  # OH
+                    {"Fc":1.200e9, "decimation": 8, "dst_IP": 0xc0a805bf, "dsp_port": 0xce02, },  # OH
+                    {"Fc":1.300e9, "decimation": 8, "dst_IP": 0xc0a805bf, "dsp_port": 0xce03, },  # OH
+                    #{"Fc":1.666e9, "decimation": 8, "dst_IP": 0xc0a805bf, "dsp_port": 0xce00, },  # OH
+                    #{"Fc":1.610e9, "decimation": 8, "dst_IP": 0xc0a805be, "dsp_port": 0xce02, },  # OH
+                    #{"Fc":1.715e9, "decimation": 8, "dst_IP": 0xc0a805b5, "dsp_port": 0xce02, },  # OH
+                    
                     ]
 
+# ungracefully force reset of 10G interfaces
+mydesign.monitor()
 for receiver, config in zip(mydesign.Receivers, receiver_configs):
-  receiver.disable()
-  receiver.network_config(config["dst_IP"], config["dsp_port"])
-  #receiver.scale = 0
+  print('Reseting ', receiver.receiver_basename[:-1])
+  while receiver.status() != 0:
+    receiver.disable()
+    receiver.enable()
+
+
+mydesign.monitor()
+for receiver, config in zip(mydesign.Receivers, receiver_configs):
+  print("Configure with: ", config)
   receiver.Fc = config["Fc"]
   receiver.decimation = config["decimation"]
-  receiver.scale = 10
-  #receiver.kc = 450
-
-for receiver, config in zip(mydesign.Receivers, receiver_configs):
+  receiver.scale = 7
+  receiver.network_config(config["dst_IP"], config["dsp_port"])
   receiver.enable()
 
 
-# check that NCO tables are programmed properly
-if True:
-  for receiver, config in zip(mydesign.Receivers, receiver_configs):
-    prev_tables = receiver.NCO_tables.copy()
-    receiver.NCO_read_tables()
-    new_tables = receiver.NCO_tables.copy()
-    assert (prev_tables == new_tables).all()
-
-
-
-1/0
-
-snap = mydesign.fpga.snapshots['burster0_status_snap_ss']
-snap = mydesign.fpga.snapshots['TenGbE0_stream_in_bus_ss']
-snap = mydesign.fpga.snapshots['TenGbE0_spead_out_ss']
-
-snap.arm(man_valid=True)
-#mydesign.arm_PPS()
-for itt in range(10):
-  d=snap.read(man_valid=True, man_trig=True)
-  nof_fields = len(d['data'].keys())
-  fig, axs = plt.subplots(figsize=(10, 20),
-                          nrows=nof_fields, ncols=1,
-                          sharex=True)
-  for ax, (k,v )in zip(axs, d['data'].items()):
-    ax.plot(v, label=k)
-    ax.set_ylabel(k)
-  plt.tight_layout()                        
-plt.show(block=False)
-
-
-
-
-
 print('Wait for half second and arm PPS_trigger')
+mydesign.monitor()
 mydesign.arm_PPS()
 mydesign.monitor()
 
+print('Started!!!')
+for itt in range(5):
+    time.sleep(1)
+    mydesign.monitor()
 
-my_hist = histogram.histogram(mydesign.fpga, basename='rcvr0_HBs_dec')
-names = ('dec_fir', 'HB2', 'HB1', 'HB0')
-for sel, name in enumerate(names):
-    mydesign.fpga.write_int('rcvr0_HBs_hist_sel', sel)
-    time.sleep(2)
-    my_hist.get_counts()
-    print(my_hist.buses)
-    my_hist.plot_counts(suptitle=name)
+1/0
 
 
-# get and plot some data from mixer and dec_fir to chek data formats and overflows
-for receiver in mydesign.Receivers:
-  snap_names = ("dec_out",
-                "HBs_HB2_out",
-                "HBs_HB1_out",
-                "HBs_HB0_out",
-                )
-  raw_fmt = False                
-  snap_data = {}
-  fig, axs = plt.subplots(figsize=(10, 10),
-                          nrows = len(snap_names), 
-                          ncols = 1,
-                          sharex='col',
-                          #sharey='col',
-                          )
-  if len(snap_names) == 1:
-    axs = (axs,)
-  for ax, snap_name in zip(axs, snap_names):
-    (d_w, d_dp), dat = receiver.get_snapshot(snap_name=snap_name, raw_fmt=raw_fmt)
-    integer_part_w = d_w - d_dp - 1
-    max_modulus = 2**integer_part_w
-    if len(dat.shape) == 1:
-      dat = dat[:, None]
-    mean = np.mean(dat, axis=0)
-    std = np.std(dat, axis=0)
-    ax.plot(dat)
-    snap_data[snap_name] = dat
-    title = snap_name + "\n$\mu \pm \sigma =$"
-    for m,s in zip(mean, std):
-      title +=  "\n$%4.2f \pm %4.2f$" % (m, s)
-    title = title[:-1] + "$"
-    ax.set_title(title)
-    ax.set_ylim((-max_modulus, max_modulus))
-    
-    if snap_name == "dec_out":
-      dat.shape = (-1, 2, 2)
-      dat = dat[..., 0] + 1j * dat[..., 1]
-      DAT = np.fft.fft(dat, axis=0)
-      DAT[DAT == 0] = 0.01
-      DAT = np.fft.fftshift(DAT, axes=0)
-      DAT = 10*np.log10(DAT.real**2 + DAT.imag**2)
-      fig_tx, ax = plt.subplots(figsize=(10, 10))
-      ax.plot(DAT)
-      ax.axvline(1023, c='r')
-      ax.axvline(2048+1024, c='r')
-plt.show(block=False)
+receiver = mydesign.Receivers[0]
+config = receiver_configs[0]
+#for Fc in np.arange(0, 33) * Fe/2/32: 
+for Fc in np.arange(32, 65) * Fe/2/32: 
+    print(Fc)
+    receiver.Fc=Fc
+    receiver.network_config(config["dst_IP"], config["dsp_port"])
+    time.sleep(10)
+receiver.Fc=0
+receiver.network_config(config["dst_IP"], config["dsp_port"])
 
 
-for receiver in mydesign.Receivers:
+receiver0 = mydesign.Receivers[0]
+config = receiver_configs[0]
+receiver0.Fc= config["Fc"]
+receiver0.scale = 9
+receiver0.network_config(config["dst_IP"], config["dsp_port"])
+
+receiver1 = mydesign.Receivers[1]
+config = receiver_configs[1]
+receiver1.Fc= config["Fc"]
+receiver1.scale = 9
+receiver1.network_config(config["dst_IP"], config["dsp_port"])
+
+
+
+receiver = mydesign.Receivers[0]
+if True:
               # snap_name,          decimation, ymin, ymax
   confs = (#(    "dec_out",                   1,  -20,   30),
            ("HBs_HB2_out",                   2,  -20,   30),
-           #("HBs_HB1_out",                   4,  -20,   30),
+           ("HBs_HB1_out",                   4,  -20,   30),
            ("HBs_HB0_out", receiver.decimation,  -20,   30),
+           ("rescale_out", receiver.decimation,  -20,   30),
+           
            )
   base_BW = receiver.Fe / receiver.NCO_par
   for snap_name, decimation, ymin, ymax in confs:
@@ -466,7 +414,7 @@ for receiver in mydesign.Receivers:
     dats = dats[..., 0] + 1j * dats[..., 1]
     BW = receiver.Fe / receiver.NCO_par / decimation
     
-    if False:
+    if True:
       fig, axs = plt.subplots(nrows=2, ncols=2,
                               sharex='row', sharey='all',
                               figsize=(10, 5))
@@ -478,7 +426,7 @@ for receiver in mydesign.Receivers:
           axs[1, pol].plot(dats[itt, :, pol].imag, 'g')
       axs[0, 0].set_xlim(-1,1)
       axs[0, 0].set_ylim(-1,1)
-      fig.suptitle(str(receiver) + "\nBW=%6.2f MHz" % (BW*1e-6))
+      fig.suptitle(str(receiver) + " " + snap_name + "\nBW=%6.2f MHz" % (BW*1e-6))
     
     
     DATs = np.fft.fft(dats, axis=1)
@@ -549,7 +497,7 @@ for receiver in mydesign.Receivers:
     axs[1, 1].set_xlim((receiver.Fc-base_BW/2, receiver.Fc+base_BW/2))
     axs[1, 0].set_xlabel('Freq (Hz)')
     axs[1, 1].set_xlabel('Freq (Hz)')
-    fig.suptitle(str(receiver) + "\nBW=%6.2f MHz" % (BW*1e-6))
+    fig.suptitle(str(receiver) + " " + snap_name + "\nBW=%6.2f MHz" % (BW*1e-6))
     
         
     def update_clim(ax):
@@ -565,29 +513,5 @@ plt.show(block=False)
 
 
 
-print('Started!!!')
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-mydesign.monitor()
 
 
-mydesign.monitor()
-
-# after dummy frame, allow outputing data and starting framer 
-mydesign.SEFRAM.enable()
-
-mydesign.SEFRAM.time = "now"  # set time to current UNIX timestamp
-print(mydesign.SEFRAM.time)
-
-
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-mydesign.monitor()
-time.sleep(1)
-
-
-plt.show()

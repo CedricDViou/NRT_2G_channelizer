@@ -186,15 +186,15 @@ if False:
 
 
 fig, axs = plt.subplots(nrows = len(mydesign.ADCs), 
-                        ncols = 3, # wave, histogram, spectrum
+                        ncols = 3,
                         sharex='col', sharey='col',
                         )
 for ADC_axs, ADC in zip(axs, mydesign.ADCs):
-  ADC.plot_snapshot(ADC_axs)
+  ADC.get_snapshot()
+  ADC.plot_interleaved_data(ADC_axs)
 plt.tight_layout()
 plt.show(block=False)
 
-1/0
 
 
 print('SEFRAM Configuration')
