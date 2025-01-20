@@ -109,12 +109,17 @@ $ python setup install
 - Adapt setup instructions for DHCP+TFTP+NFS from https://docs.google.com/a/ska.ac.za/document/d/1tqw4C6uZ6EULl1OykTFL_vQTnK52UBr0aYqTg44E5wg, sections k, l, m.
 
 ```
+# get romfs and uImage in tftpboot:
 git clone https://github.com/ska-sa/roach2_nfs_uboot
 sudo -i
 cd /home/cedric/roach2_nfs_uboot
-mkdir -p /home/nfs/roach2
-cp -r roach2_nfs_uboot/tftpboot/uboot-roach2 /home/nfs/roach2
-mv /home/nfs/roach2/uboot-roach2 /home/nfs/roach2/boot
+mkdir -p /home/nfs/roach2 /home/nfs/tftpboot/uboot-roach2
+cp /home/cedric/roach2_nfs_uboot/boot/* /home/nfs/tftpboot/uboot-roach2
+cd /home/nfs/tftpboot/uboot-roach2
+ln -s uboot-roach2/roach2-root-phyprog-release-2015-04-01.romfs romfs
+ln -s uboot-roach2/uImage-roach2-3.16-hwmon uImage
+
+# Setup file system
 Download https://drive.google.com/file/d/1vdTiA1MazQ7_HBKMc3J9Hbpync2UWM7w/view?usp=sharing
 tar xzvf squeeze_root.ppc.20190202.tar.gz -C /home/nfs/roach2
 cd /home/nfs/roach2
