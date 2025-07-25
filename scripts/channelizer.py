@@ -150,14 +150,19 @@ class pulsar_channelizer(object):
             self.channelizer_basename,
             self.rescale_basename,
             )
-  
+
+
   def disable(self):
-    print('Reset some counters')
     self.fpga.write_int('TenGbE_rst', 0xFF)
 
   def enable(self):
     self.fpga.write_int('TenGbE_rst', 0x00)
-    # reset reorder
+
+  def reset(self):
+    self.disable()
+    self.enable()
+
+  def arm(self):
     self.fpga.write_int('channelizer_arm', 1)
     self.fpga.write_int('channelizer_arm', 0)
 
@@ -198,16 +203,6 @@ class pulsar_channelizer(object):
     # write 0's on unused ones (will be used to reset round robin later on)
     ports = (
       2000,
-      2001,
-      2002,
-      2003,
-      2004,
-      2005,
-      2006,
-      2007,
-    )
-    ports = (
-      2000,
       2000,
       2000,
       2000,
@@ -222,6 +217,23 @@ class pulsar_channelizer(object):
       self.fpga.write_int('TGbEs_dst_port_cfg', port)        # set port to configure
       self.fpga.write_int('TGbEs_dst_port_wr' , 1<<port_idx) # latch appropriate reg
     self.fpga.write_int('TGbEs_dst_port_wr' , 0)             # release latch when done
+
+    print('Config MAC addresses')
+    macs = [0x00ffffffffffff, ] * 256
+    macs[180] = 0x9c63c0f82f6e   # '9c:63:c0:f8:2f:6e'
+    macs[181] = 0x9c63c0f82f6e
+    macs[182] = 0x9c63c0f82f6e
+    macs[183] = 0x9c63c0f82f6e
+    macs[184] = 0x9c63c0f82f6f   # '9c:63:c0:f8:2f:6f'
+    macs[185] = 0x9c63c0f82f6f
+    macs[186] = 0x9c63c0f82f6f
+    macs[187] = 0x9c63c0f82f6f
+    
+    #gbe.set_arp_table(macs) # will fail
+    macs_pack = struct.pack('>%dQ' % (len(macs)), *macs)
+    for gbe in self.fpga.gbes:
+        self.fpga.blindwrite(gbe.name, macs_pack, offset=0x3000)
+    
   
   @property
   def scale(self):
